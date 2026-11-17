@@ -4,3 +4,6 @@ node_modules
 bun.lock
 drizzle
 e2e/captures
+
+# Généré par `bun run allowlist`
+browser/policies-allowlist.json

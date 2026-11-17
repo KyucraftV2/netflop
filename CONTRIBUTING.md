@@ -68,9 +68,19 @@ Dans un navigateur Netflop (ou un Chrome normal) :
 
 ### 5. Liste blanche de Chrome
 
-Les domaines de `allowedDomains` servent aussi à générer la liste blanche d'URL de
-l'image navigateur (option `NETFLOP_URL_ALLOWLIST`). Ajoute ceux du CDN et de la
-connexion (pages d'authentification, captcha) si la plateforme en utilise d'autres.
+`browser/policies-allowlist.json` est **généré** à partir des `allowedDomains` des
+plateformes, des domaines supplémentaires de `EXTRA_DOMAINS` et des domaines communs
+(connexion, captchas, CDN, Widevine) de `lib/allowlist.ts` :
+
+```bash
+bun run allowlist            # régénère le fichier après une modification
+bun run allowlist --check    # vérifie qu'il est à jour (aussi testé par `bun run test`)
+```
+
+Un CDN qui ne doit pas être une cible de navigation du hub va dans `EXTRA_DOMAINS`, pas
+dans `allowedDomains`. Pour tester : image avec `NETFLOP_URL_ALLOWLIST=1` (ou le tag
+`latest-allowlist`), puis connexion et lecture complète. Un domaine manquant se voit dans
+les outils de développement (`ERR_BLOCKED_BY_ADMINISTRATOR`).
 
 ### Plateformes non validées en conditions réelles
 
