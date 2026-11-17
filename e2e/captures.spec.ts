@@ -22,6 +22,8 @@ test("captures", async ({ page }) => {
     ]);
   await page.goto("/");
   await shot(page, "accueil");
+  await page.goto("/?toutes=1");
+  await shot(page, "accueil-toutes-plateformes");
   await page.goto("/?q=last");
   await page.getByRole("button", { name: /The Last of Us/ }).waitFor();
   await shot(page, "recherche");
