@@ -3,13 +3,16 @@ import { Suspense } from "react";
 import { ContinueRow } from "@/components/home/continue-row";
 import { Hero } from "@/components/home/hero";
 import { PlatformTiles } from "@/components/home/platform-tiles";
+import { PosterRow } from "@/components/home/poster-row";
 import { SearchResults } from "@/components/home/search-results";
+import { WatchlistProvider } from "@/components/home/watchlist-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requirePageUser } from "@/lib/auth-guard";
 import { getDb } from "@/lib/db";
 import { userSubscriptions } from "@/lib/db/schema";
 import { logger, errorMessage } from "@/lib/log";
 import { continueWatching } from "@/lib/watch-history";
+import { listWatchlist, watchlistKeys } from "@/lib/watchlist";
 
 const log = logger("home");
 
@@ -20,32 +23,44 @@ export default async function HomePage({
 }) {
   const user = await requirePageUser();
   const { toutes, q } = await searchParams;
-  const subscribed = (
+  const subscribed = await getSubscribed(user.id);
+  const searching = (q ?? "").trim().length >= 2;
+  const inList = await watchlistKeys(user.id);
+
+  return (
+    <WatchlistProvider initial={inList}>
+      <main className="mx-auto max-w-[1600px] px-4 md:px-8">
+        {searching ? (
+          <div className="pt-20 md:pt-24">
+            <Suspense fallback={null}>
+              <SearchResults subscribed={subscribed} />
+            </Suspense>
+          </div>
+        ) : (
+          <>
+            <Suspense fallback={<HeroAndRowSkeleton />}>
+              <ContinueSection userId={user.id} name={user.displayName} />
+            </Suspense>
+            {inList.length > 0 ? (
+              <Suspense fallback={<RowSkeleton />}>
+                <WatchlistSection userId={user.id} subscribed={subscribed} />
+              </Suspense>
+            ) : null}
+            <PlatformTiles subscribed={subscribed} showAll={toutes === "1"} />
+          </>
+        )}
+      </main>
+    </WatchlistProvider>
+  );
+}
+
+async function getSubscribed(userId: string) {
+  return (
     await getDb()
       .select({ platform: userSubscriptions.platform })
       .from(userSubscriptions)
-      .where(eq(userSubscriptions.userId, user.id))
+      .where(eq(userSubscriptions.userId, userId))
   ).map((s) => s.platform);
-  const searching = (q ?? "").trim().length >= 2;
-
-  return (
-    <main className="mx-auto max-w-[1600px] px-4 md:px-8">
-      {searching ? (
-        <div className="pt-20 md:pt-24">
-          <Suspense fallback={null}>
-            <SearchResults subscribed={subscribed} />
-          </Suspense>
-        </div>
-      ) : (
-        <>
-          <Suspense fallback={<HeroAndRowSkeleton />}>
-            <ContinueSection userId={user.id} name={user.displayName} />
-          </Suspense>
-          <PlatformTiles subscribed={subscribed} showAll={toutes === "1"} />
-        </>
-      )}
-    </main>
-  );
 }
 
 async function ContinueSection({ userId, name }: { userId: string; name: string }) {
@@ -58,6 +73,46 @@ async function ContinueSection({ userId, name }: { userId: string; name: string 
       <Hero card={cards[0] ?? null} name={name} />
       <ContinueRow cards={cards} />
     </>
+  );
+}
+
+async function WatchlistSection({
+  userId,
+  subscribed,
+}: {
+  userId: string;
+  subscribed: Awaited<ReturnType<typeof getSubscribed>>;
+}) {
+  const items = await listWatchlist(userId).catch((err: unknown) => {
+    log.warn("ma liste", { error: errorMessage(err) });
+    return [];
+  });
+  return (
+    <PosterRow
+      id="ma-liste-titre"
+      title="Ma liste"
+      subscribed={subscribed}
+      items={items.map((i) => ({
+        ...i,
+        available: i.platforms.some((p) => subscribed.includes(p)),
+      }))}
+    />
+  );
+}
+
+function RowSkeleton() {
+  return (
+    <div className="mt-8">
+      <Skeleton className="h-6 w-40" />
+      <div className="mt-3 flex gap-3 overflow-hidden">
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <Skeleton
+            key={i}
+            className="aspect-[2/3] w-[38vw] shrink-0 sm:w-[26vw] md:w-[18vw] lg:w-[14vw]"
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 

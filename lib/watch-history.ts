@@ -5,6 +5,7 @@ import { errorMessage, logger } from "./log";
 import type { PlatformId } from "./platforms";
 import { nextEpisode, titleDetails, type MediaType } from "./tmdb";
 import { STARTED_SECONDS } from "./tracker/progress";
+import { removeWatchedMovie } from "./watchlist";
 
 /**
  * Lecture et édition de l'historique. TOUTES les requêtes sont filtrées par userId :
@@ -142,14 +143,16 @@ export async function deleteProgress(userId: string, id: number): Promise<void> 
 }
 
 export async function setWatched(userId: string, id: number, watched: boolean): Promise<void> {
-  await getDb()
+  const [row] = await getDb()
     .update(watchProgress)
     .set(
       watched
         ? { completed: true, manual: true, percent: 1 }
         : { completed: false, manual: true, percent: 0, position: 0 },
     )
-    .where(and(eq(watchProgress.id, id), eq(watchProgress.userId, userId)));
+    .where(and(eq(watchProgress.id, id), eq(watchProgress.userId, userId)))
+    .returning({ tmdbId: watchProgress.tmdbId, type: watchProgress.type });
+  if (watched && row?.tmdbId && row.type === "movie") await removeWatchedMovie(userId, row.tmdbId);
 }
 
 /** Corrige l'identification d'une entrée « à confirmer » (fusion si l'œuvre existe déjà). */
