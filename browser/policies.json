@@ -1,0 +1,38 @@
+{
+  "HomepageLocation": "file:///opt/netflop/home/index.html",
+  "HomepageIsNewTabPage": false,
+  "ShowHomeButton": true,
+  "NewTabPageLocation": "file:///opt/netflop/home/index.html",
+  "RestoreOnStartup": 4,
+  "RestoreOnStartupURLs": ["file:///opt/netflop/home/index.html"],
+
+  "PasswordManagerEnabled": false,
+  "PasswordLeakDetectionEnabled": false,
+  "ImportSavedPasswords": false,
+  "AutofillAddressEnabled": false,
+  "AutofillCreditCardEnabled": false,
+  "BrowserSignin": 0,
+  "SyncDisabled": true,
+  "TranslateEnabled": false,
+  "SpellcheckEnabled": false,
+  "DefaultBrowserSettingEnabled": false,
+  "MetricsReportingEnabled": false,
+  "PromotionalTabsEnabled": false,
+  "PrivacySandboxPromptEnabled": false,
+  "CommandLineFlagSecurityWarningsEnabled": false,
+  "BackgroundModeEnabled": false,
+
+  "AutoplayAllowed": true,
+  "FullscreenAllowed": true,
+  "ComponentUpdatesEnabled": true,
+  "RemoteDebuggingAllowed": true,
+
+  "ExtensionInstallBlocklist": ["*"],
+  "DownloadRestrictions": 3,
+  "AllowFileSelectionDialogs": false,
+  "PrintingEnabled": false,
+  "DefaultNotificationsSetting": 2,
+  "DefaultGeolocationSetting": 2,
+  "AudioCaptureAllowed": false,
+  "VideoCaptureAllowed": false
+}

@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens Netflop — fichier UNIQUE.
+ * Couleurs, rayons, ombres et durées ; utilisés via les classes Tailwind
+ * (bg-bg, bg-surface, text-fg, text-muted, bg-accent, rounded-card, shadow-card…).
+ */
+@theme {
+  --color-bg: #141414;
+  --color-surface: #1f1f1f;
+  --color-surface-2: #2a2a2a;
+  --color-surface-3: #3a3a3a;
+  --color-fg: #e5e5e5;
+  --color-muted: #a3a3a3;
+  --color-accent: #e50914;
+  --color-accent-hover: #f6121d;
+  --color-success: #46d369;
+  --color-warning: #f5b50a;
+  --color-danger: #ff4d4f;
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    "Noto Sans", sans-serif;
+
+  --radius-card: 0.5rem;
+  --radius-tile: 0.75rem;
+  --radius-pill: 9999px;
+
+  --shadow-card: 0 4px 16px rgb(0 0 0 / 0.45);
+  --shadow-pop: 0 12px 40px rgb(0 0 0 / 0.6);
+
+  --ease-netflop: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-bg text-fg font-sans antialiased;
+    min-height: 100dvh;
+  }
+  :focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* Zones sûres (encoche) SANS marge propre : pour les conteneurs pleine largeur. */
+  .safe-x {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  /* Marge horizontale de contenu qui respecte aussi l'encoche (paysage iPhone). */
+  .safe-px {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+  @media (min-width: 768px) {
+    .safe-px {
+      padding-left: max(2rem, env(safe-area-inset-left));
+      padding-right: max(2rem, env(safe-area-inset-right));
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

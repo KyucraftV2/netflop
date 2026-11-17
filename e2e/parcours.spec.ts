@@ -1,0 +1,119 @@
+import { expect, test, type Page } from "@playwright/test";
+import { E2E_SESSION_TOKEN } from "./global-setup";
+
+async function login(page: Page) {
+  await page
+    .context()
+    .addCookies([
+      { name: "authjs.session-token", value: E2E_SESSION_TOKEN, domain: "localhost", path: "/" },
+    ]);
+}
+
+test("sans session → page de connexion", async ({ page }) => {
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/login/);
+  await expect(page.getByRole("button", { name: "Se connecter" })).toBeVisible();
+});
+
+test("accueil : uniquement mes plateformes et « Continuer à regarder »", async ({ page }) => {
+  await login(page);
+  await page.goto("/");
+  await expect(page.getByRole("link", { name: /Regarder Netflix/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Regarder Canal\+/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Regarder france\.tv/ })).toHaveCount(0);
+  await expect(page.getByText("inclut HBO Max et Apple TV+").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Continuer à regarder" })).toBeVisible();
+  await expect(page.getByText("S2 · É4").first()).toBeVisible();
+  await page.getByRole("link", { name: "Voir toutes les plateformes" }).click();
+  await expect(page.getByRole("link", { name: /Regarder france\.tv/ })).toBeVisible();
+});
+
+test("recherche, filtre « mes abonnements » puis lancement de lecture simulé", async ({ page }) => {
+  await login(page);
+  await page.goto("/");
+
+  // Ouvre le champ sur mobile (icône), directement visible sur ordinateur.
+  const field = page.getByRole("searchbox", { name: /Rechercher un film ou une série/ });
+  if (!(await field.isVisible())) await page.getByRole("button", { name: "Rechercher" }).click();
+  await field.fill("last");
+
+  await expect(page.getByRole("button", { name: /The Last of Us.*canalplus/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /The Last Kingdom.*netflix/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Last Night in Soho/ })).toHaveCount(0);
+
+  await page.getByRole("switch", { name: "Mes abonnements uniquement" }).click();
+  await expect(page.getByRole("button", { name: /Last Night in Soho/ })).toBeVisible();
+  await page.getByRole("switch", { name: "Mes abonnements uniquement" }).click();
+
+  // Navigateur simulé : l'API Docker/Neko n'est pas sollicitée.
+  let statusCalls = 0;
+  await page.route("**/api/browser/open", (r) =>
+    r.fulfill({ json: { state: "starting", watchUrl: "/watch/canalplus?opened=1" } }),
+  );
+  const ready = {
+    state: "ready",
+    slot: 0,
+    slug: "alice",
+    platform: "canalplus",
+    stillWatchingPrompt: false,
+    opened: {
+      platform: "canalplus",
+      url: "https://www.canalplus.com/",
+      title: "The Last of Us",
+      tmdbId: 100088,
+      type: "tv",
+      openedAt: "",
+    },
+    pendingUrl: null,
+    error: null,
+  };
+  await page.route("**/api/browser/status", (r) =>
+    r.fulfill({ json: ++statusCalls < 2 ? { ...ready, state: "starting" } : ready }),
+  );
+  await page.route("**/api/browser/heartbeat", (r) => r.fulfill({ json: ready }));
+  await page.route("**/api/browser/still-watching", (r) => r.fulfill({ status: 204 }));
+  await page.route("**/api/browser/leave", (r) => r.fulfill({ status: 204 }));
+  await page.route("**/api/browser/quit", (r) => r.fulfill({ status: 204 }));
+  await page.route("**/b/alice/**", (r) =>
+    r.fulfill({
+      contentType: "text/html",
+      body: "<html><body style='background:#000;color:#fff'>NEKO</body></html>",
+    }),
+  );
+
+  await page.getByRole("button", { name: /The Last of Us/ }).click();
+  await expect(page).toHaveURL(/\/watch\/canalplus\?opened=1/);
+  await expect(page.locator('iframe[title^="Navigateur Netflop"]')).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(
+    page.frameLocator('iframe[title^="Navigateur Netflop"]').getByText("NEKO"),
+  ).toBeVisible();
+  await expect(page.getByRole("toolbar", { name: "Commandes de lecture" })).toContainText(
+    "The Last of Us",
+  );
+
+  // Écran « Tourne ton téléphone » éventuel (mobile en portrait)
+  const keepPortrait = page.getByRole("button", { name: "Continuer en portrait" });
+  if (await keepPortrait.isVisible()) await keepPortrait.click();
+  const sound = page.getByRole("button", { name: "Appuie pour activer le son" });
+  if (await sound.isVisible()) await sound.click();
+
+  await page.mouse.move(10, 10);
+  await page.getByRole("button", { name: "Quitter" }).click();
+  await expect(page).toHaveURL(/\/$/);
+});
+
+test("pages protégées : historique, profil, admin, 404", async ({ page }) => {
+  await login(page);
+  await page.goto("/historique");
+  await expect(page.getByRole("heading", { name: "Historique" })).toBeVisible();
+  await expect(page.getByText("The Last Kingdom")).toBeVisible();
+  await page.goto("/profil");
+  await expect(page.getByRole("heading", { name: "Mes abonnements" })).toBeVisible();
+  await page.goto("/admin");
+  await expect(page.getByRole("heading", { name: "Administration" })).toBeVisible();
+  const res = await page.goto("/nimporte-quoi");
+  expect(res?.status()).toBe(404);
+  await expect(page.getByText("404")).toBeVisible();
+});

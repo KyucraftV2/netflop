@@ -1,0 +1,15 @@
+node_modules
+.next
+dist
+.git
+.env
+.env.*
+!.env.example
+browser
+tests
+coverage
+*.md
+e2e
+playwright.config.ts
+test-results
+playwright-report

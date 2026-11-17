@@ -1,0 +1,194 @@
+# Netflop — services permanents uniquement.
+# Les navigateurs Neko (neko-<user>) sont créés dynamiquement par le hub/worker
+# via docker-proxy ; ils ne figurent PAS ici.
+name: netflop
+
+x-common: &common
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  hub:
+    <<: *common
+    build: .
+    image: netflop-hub:latest
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://netflop:${POSTGRES_PASSWORD}@db:5432/netflop
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      traefik:
+        # Nom unique sur le réseau Traefik (utilisé par le forwardAuth).
+        aliases: [netflop-hub]
+      internal: {}
+      browsers:
+        # IP fixe : seule adresse (avec le worker) autorisée sur le relais CDP des navigateurs.
+        ipv4_address: ${BROWSER_SUBNET_PREFIX:-172.30.250}.2
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${TRAEFIK_NETWORK}
+      # Routeur principal du hub
+      traefik.http.routers.netflop.rule: Host(`${HUB_DOMAIN:?HUB_DOMAIN manquant dans .env}`)
+      traefik.http.routers.netflop.entrypoints: ${TRAEFIK_ENTRYPOINT:-websecure}
+      traefik.http.routers.netflop.tls: "true"
+      traefik.http.routers.netflop.tls.certresolver: ${CERT_RESOLVER}
+      traefik.http.routers.netflop.service: netflop
+      traefik.http.services.netflop.loadbalancer.server.port: "3000"
+      # Middleware forwardAuth utilisé par les routeurs /b/<user> des navigateurs
+      traefik.http.middlewares.netflop-browser-auth.forwardauth.address: http://netflop-hub:3000/api/browser-auth
+      traefik.http.middlewares.netflop-browser-auth.forwardauth.authResponseHeaders: X-Netflop-User
+      # En-têtes des navigateurs : seul le hub peut les afficher en iframe
+      traefik.http.middlewares.netflop-browser-headers.headers.contentSecurityPolicy: frame-ancestors https://${HUB_DOMAIN}
+      traefik.http.middlewares.netflop-browser-headers.headers.contentTypeNosniff: "true"
+      traefik.http.middlewares.netflop-browser-headers.headers.referrerPolicy: same-origin
+
+  worker:
+    <<: *common
+    image: netflop-hub:latest
+    pull_policy: never # image construite par le service hub
+    command: ["node", "worker.js"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://netflop:${POSTGRES_PASSWORD}@db:5432/netflop
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      docker-proxy:
+        condition: service_started
+    networks:
+      internal: {}
+      browsers:
+        ipv4_address: ${BROWSER_SUBNET_PREFIX:-172.30.250}.3
+
+  # Applique les migrations versionnées (drizzle/) puis s'arrête.
+  migrate:
+    image: netflop-hub:latest
+    pull_policy: never # image construite par le service hub
+    command: ["node", "migrate.js"]
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      DATABASE_URL: postgresql://netflop:${POSTGRES_PASSWORD}@db:5432/netflop
+      MIGRATIONS_DIR: /app/drizzle
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      internal: {}
+
+  db:
+    <<: *common
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: netflop
+      POSTGRES_DB: netflop
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans .env}
+    volumes:
+      - netflop-db:/var/lib/postgresql/data
+    networks:
+      internal: {}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netflop -d netflop"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  docker-proxy:
+    <<: *common
+    image: tecnativa/docker-socket-proxy:3.4
+    environment:
+      # Strict minimum : conteneurs, réseaux (rattachement), volumes (profils).
+      CONTAINERS: 1
+      NETWORKS: 1
+      VOLUMES: 1
+      POST: 1
+      # Tout le reste désactivé
+      AUTH: 0
+      BUILD: 0
+      COMMIT: 0
+      CONFIGS: 0
+      DISTRIBUTION: 0
+      EVENTS: 0
+      EXEC: 0
+      GRPC: 0
+      IMAGES: 0
+      INFO: 0
+      NODES: 0
+      PING: 0
+      PLUGINS: 0
+      SECRETS: 0
+      SERVICES: 0
+      SESSION: 0
+      SWARM: 0
+      SYSTEM: 0
+      TASKS: 0
+      VERSION: 0
+      ALLOW_START: 1
+      ALLOW_STOP: 1
+      ALLOW_RESTARTS: 0
+      DISABLE_IPV6: 1
+    volumes:
+      # Le SEUL montage du socket Docker de tout le projet.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    read_only: true
+    tmpfs:
+      - /run
+      - /tmp
+    networks:
+      internal: {}
+
+  # Image des navigateurs (pas un service) :
+  #   docker compose --profile build build browser-image
+  browser-image:
+    build:
+      context: ./browser
+      args:
+        NETFLOP_URL_ALLOWLIST: ${NETFLOP_URL_ALLOWLIST:-0}
+    image: netflop-browser:latest
+    profiles: ["build"]
+
+networks:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK}
+  # Plan de contrôle : hub, worker, migrate, db, docker-proxy. AUCUN navigateur.
+  # `internal: true` : pas d'accès Internet (db et docker-proxy n'en ont pas besoin).
+  internal:
+    name: netflop-internal
+    driver: bridge
+    internal: true
+  # Navigateurs + hub (.2) + worker (.3) + Traefik (à connecter, voir README).
+  # Les navigateurs ne sont sur AUCUN autre réseau : ils ne voient ni Postgres,
+  # ni docker-proxy, ni les autres services du VPS présents sur le réseau Traefik.
+  browsers:
+    name: netflop-browsers
+    driver: bridge
+    ipam:
+      config:
+        # .2-.3 : hub/worker ; .10-.127 : navigateurs (IP fixe = .10 + slot) ;
+        # .128-.254 : attribution automatique (Traefik).
+        - subnet: ${BROWSER_SUBNET_PREFIX:-172.30.250}.0/24
+          ip_range: ${BROWSER_SUBNET_PREFIX:-172.30.250}.128/25
+
+volumes:
+  netflop-db:
+    name: netflop-db

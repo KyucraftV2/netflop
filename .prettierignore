@@ -1,0 +1,6 @@
+.next
+dist
+node_modules
+bun.lock
+drizzle
+e2e/captures
