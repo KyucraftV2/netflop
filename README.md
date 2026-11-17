@@ -43,42 +43,100 @@ Chaque navigateur a la configuration suivante :
 - **Profil** : volume `netflop-profile-<user>` monté sur `/home/neko/chrome-profile`.
 - **Routage** : Neko est servi directement sous `/b/<user>/` (`NEKO_SERVER_PATH_PREFIX`), sans StripPrefix.
 
-## Installation sur le VPS
+## Installation
 
-Prérequis :
+Netflop s'installe sur n'importe quelle machine Linux qui fait tourner Docker et qui est
+joignable depuis Internet : serveur dédié, VPS, mini-PC ou NAS à la maison, machine
+virtuelle…
 
-- Docker Engine ≥ 25 (API 1.44) avec le plugin Compose.
-- Traefik v2 ou v3 déjà en place avec le provider Docker. Le nom du provider doit être `docker`, car les middlewares sont référencés en `@docker`.
-- Un résolveur Let's Encrypt.
-- Un enregistrement DNS `netflop.example.com` qui pointe vers le VPS.
+### Prérequis
+
+| Élément        | Détail                                                                                                                                    |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Machine        | Linux **x86_64 ou arm64** (Google Chrome n'existe pas pour les autres architectures)                                                      |
+| Mémoire        | Environ **1,5 Go par navigateur simultané**, plus environ 1 Go pour le reste (hub, worker, base). Avec 3 navigateurs, prévois 6 Go libres |
+| Docker         | Docker Engine ≥ 25 (API 1.44) avec le plugin Compose                                                                                      |
+| Reverse proxy  | Traefik v2 ou v3 avec le provider Docker. Il doit s'appeler `docker`, car les middlewares sont référencés en `@docker`                    |
+| HTTPS          | Un résolveur de certificats dans Traefik (Let's Encrypt, par exemple)                                                                     |
+| Nom de domaine | Un enregistrement DNS (ex. `netflop.example.com`) qui pointe vers la machine                                                              |
+| Identité       | Un serveur Authentik (voir [Configuration Authentik](#configuration-authentik))                                                           |
+| Réseau         | Une IPv4 publique joignable sur les ports WebRTC (UDP, plus TCP en secours), un par navigateur simultané                                  |
+| Catalogue      | Une clé d'API [TMDB](https://www.themoviedb.org/settings/api), gratuite                                                                   |
+
+Derrière une box (NAT) : `PUBLIC_IP` est l'IP publique de la box. Redirige vers la machine
+les ports 80 et 443 (Traefik) ainsi que les ports WebRTC (`SLOT_PORTS`), en UDP et en TCP.
+
+### 1. Récupérer le code
 
 ```bash
-git clone <dépôt> /opt/netflop && cd /opt/netflop
-cp .env.example .env && chmod 600 .env
-# Remplir toutes les valeurs <...> :
-docker network ls                      # → TRAEFIK_NETWORK
-curl -4 ifconfig.me                    # → PUBLIC_IP
-nproc                                  # → VPS_CPU_CORES
-openssl rand -hex 24                   # → POSTGRES_PASSWORD
-openssl rand -base64 33                # → AUTH_SECRET
-
-# 1. Image des navigateurs (télécharge Neko + Chrome, ~2 Go)
-docker compose --profile build build browser-image
-
-# 2. Services permanents (les migrations sont appliquées par le service `migrate`)
-docker compose up -d --build
-docker compose ps                      # hub (healthy), worker, db (healthy), docker-proxy
-docker compose logs migrate            # « migrations appliquées »
-
-# 3. Traefik sur le réseau dédié aux navigateurs (créé par l'étape 2) : Traefik route
-#    /b/<user> par ce réseau. Dans le compose de Traefik, déclare aussi
-#    `netflop-browsers` en réseau externe pour que ça survive à son redémarrage.
-docker network connect netflop-browsers <conteneur traefik>
-
-# 4. Pare-feu (ports WebRTC des slots)
-sudo scripts/firewall.sh --ufw
-sudo scripts/firewall.sh               # état + commandes nmap de test
+git clone https://github.com/KyucraftV2/netflop.git
+cd netflop
 ```
+
+### 2. Configurer
+
+```bash
+cp .env.example .env && chmod 600 .env
+```
+
+Remplis toutes les valeurs `<...>` du fichier `.env` (chaque variable y est commentée).
+Les principales :
+
+| Variable                              | Comment l'obtenir                                                    |
+| ------------------------------------- | -------------------------------------------------------------------- |
+| `HUB_DOMAIN`, `AUTH_URL`              | Ton nom de domaine (`AUTH_URL=https://<HUB_DOMAIN>`)                 |
+| `TRAEFIK_NETWORK`                     | Le réseau Docker de Traefik : `docker network ls`                    |
+| `TRAEFIK_ENTRYPOINT`, `CERT_RESOLVER` | Les noms définis dans la configuration statique de Traefik           |
+| `PUBLIC_IP`                           | L'IPv4 publique de la machine (ou de la box) : `curl -4 ifconfig.me` |
+| `AUTHENTIK_URL`, `AUTH_AUTHENTIK_*`   | Voir [Configuration Authentik](#configuration-authentik)             |
+| `POSTGRES_PASSWORD`                   | `openssl rand -hex 24`                                               |
+| `AUTH_SECRET`                         | `openssl rand -base64 33`                                            |
+| `TMDB_API_KEY`                        | La clé ou le jeton v4 de ton compte TMDB                             |
+
+### 3. Construire l'image des navigateurs
+
+```bash
+docker compose --profile build build browser-image   # Neko + Chrome, environ 2 Go
+```
+
+### 4. Démarrer
+
+```bash
+docker compose up -d --build
+docker compose ps               # hub et db « healthy », worker et docker-proxy « running »
+docker compose logs migrate     # « migrations appliquées »
+```
+
+### 5. Raccorder Traefik au réseau des navigateurs
+
+Traefik joint les navigateurs (`/b/<user>/`) par le réseau dédié `netflop-browsers`, créé à
+l'étape 4 :
+
+```bash
+docker network connect netflop-browsers <conteneur traefik>
+```
+
+Pour que ce raccordement survive à un redémarrage de Traefik, déclare aussi
+`netflop-browsers` comme réseau externe dans la configuration de Traefik.
+
+### 6. Ouvrir les ports WebRTC
+
+Les ports `SLOT_PORTS` (52000 à 52002 par défaut) doivent être joignables depuis Internet,
+en UDP et en TCP :
+
+- **avec ufw** : `sudo scripts/firewall.sh --ufw`, puis `sudo scripts/firewall.sh` pour
+  afficher l'état et les commandes de test ;
+- **avec un autre pare-feu**, un pare-feu d'hébergeur ou une box : ouvre ou redirige ces
+  ports à la main.
+
+### 7. Vérifier
+
+- `https://<HUB_DOMAIN>` affiche la page de connexion.
+- Après connexion, lancer une plateforme démarre un navigateur en quelques secondes
+  (`docker ps --filter label=netflop.managed=true`).
+- Sans session, `curl -sI https://<HUB_DOMAIN>/b/<slug>/` répond `401` (et non `404`).
+
+En cas de souci, voir [Dépannage](#dépannage) et [Diagnostic d'un navigateur](#diagnostic-dun-navigateur).
 
 ### Pare-feu : ufw ne protège pas les ports publiés par Docker
 
@@ -86,7 +144,7 @@ Docker insère ses règles iptables **avant** celles d'ufw. Un port publié par 
 est donc joignable depuis Internet même si ufw le « refuse ». Netflop ne publie que les
 ports des slots ; Postgres, docker-proxy et le CDP ne le sont jamais.
 
-Pour verrouiller tous les ports publiés par Docker sur le VPS, il existe une option
+Pour verrouiller tous les ports publiés par Docker sur la machine, il existe une option
 facultative :
 
 ```bash
@@ -107,7 +165,7 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-ExecStart=/opt/netflop/scripts/firewall.sh --docker-user --yes
+ExecStart=/chemin/vers/netflop/scripts/firewall.sh --docker-user --yes
 
 [Install]
 WantedBy=multi-user.target
@@ -171,25 +229,26 @@ Ces étapes se font dans l'interface d'administration d'Authentik.
   Les pages sont coupées tout de suite, et `/b/<slug>` au plus 30 s plus tard (cache du
   forwardAuth).
 
-## Tester un navigateur (étape 1)
+## Diagnostic d'un navigateur
+
+Pour tester un navigateur sans passer par le hub (image, routage Traefik, WebRTC) :
 
 ```bash
-# Crée et démarre neko-alice sur le slot 0, sans passer par le hub
+# Crée et démarre neko-alice sur le slot 0
 docker compose exec worker node test-browser.js alice
 docker compose exec worker node test-browser.js --list
 
-# Traefik doit exposer la route automatiquement : 401 (et non 404)
-curl -sI https://netflop.example.com/b/alice/ | head -1      # HTTP/2 401
-docker logs <conteneur traefik> 2>&1 | grep netflop-b-alice  # aucune erreur de routeur
+# Traefik doit exposer la route automatiquement : 401 sans session (et non 404)
+curl -sI https://<HUB_DOMAIN>/b/alice/ | head -1
+docker logs <conteneur traefik> 2>&1 | grep netflop-b-alice   # aucune erreur de routeur
 
-# Lecture : à l'étape 1, l'authentification refuse tout (bouchon). On passe donc
-# par un tunnel SSH vers l'IP interne fixe du navigateur (slot 0 → 172.30.250.10) :
-ssh -N -L 8080:172.30.250.10:8080 <utilisateur>@<vps>
-# puis ouvre l'URL affichée par test-browser.js (http://localhost:8080/b/alice/?usr=alice&pwd=…)
-# (le flux WebRTC passe quand même par <PUBLIC_IP>:52000)
+# Accès direct, sans le forwardAuth : tunnel SSH vers l'IP fixe du navigateur
+# (slot 0 → 172.30.250.10), puis ouvre l'URL affichée par test-browser.js.
+# Le flux WebRTC passe quand même par <PUBLIC_IP>:52000.
+ssh -N -L 8080:172.30.250.10:8080 <utilisateur>@<serveur>
 
-docker stats neko-alice                      # RAM/CPU pendant une lecture
-docker compose exec worker node test-browser.js alice --rm   # le volume est conservé
+docker stats neko-alice                                         # RAM/CPU pendant une lecture
+docker compose exec worker node test-browser.js alice --rm      # le volume est conservé
 ```
 
 ## Utilisation au quotidien
@@ -215,7 +274,7 @@ docker compose exec worker node test-browser.js alice --rm   # le volume est con
 ## Mise à jour
 
 ```bash
-cd /opt/netflop && git pull
+cd netflop && git pull
 docker compose --profile build build --pull browser-image   # nouvelle version Neko/Chrome
 docker compose up -d --build                                # migrations appliquées automatiquement
 ```
@@ -239,11 +298,11 @@ sudo scripts/restore.sh /var/backups/netflop/<date> --db       # base seule
 
   ```cron
   # /etc/cron.d/netflop
-  30 4 * * * root /opt/netflop/scripts/backup.sh >>/var/log/netflop-backup.log 2>&1
+  30 4 * * * root /chemin/vers/netflop/scripts/backup.sh >>/var/log/netflop-backup.log 2>&1
   ```
 
-- Pense à copier `/var/backups/netflop` **hors du VPS** (rsync, restic…).
-- Teste la restauration de temps en temps, par exemple sur une copie du VPS.
+- Pense à copier `/var/backups/netflop` **hors de la machine** (rsync, restic…).
+- Teste la restauration de temps en temps, par exemple sur une autre machine.
 
 ## Dépannage
 
@@ -315,7 +374,7 @@ docker exec neko-<user> tail -50 /var/log/neko/google-chrome.log
   - les navigateurs ne sont que sur `netflop-browsers`, avec hub, worker et Traefik ;
   - Postgres et docker-proxy sont sur `netflop-internal` (`internal: true`, sans accès
     Internet), injoignables depuis un navigateur ;
-  - les navigateurs ne voient pas non plus les autres services du VPS présents sur le
+  - les navigateurs ne voient pas non plus les autres services de la machine présents sur le
     réseau Traefik.
 - **Neko** : un mot de passe propre à chaque séance, dérivé d'`AUTH_SECRET` et jamais
   stocké, en plus du forwardAuth.
