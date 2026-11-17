@@ -258,6 +258,47 @@ export async function recommendations(type: MediaType, tmdbId: number): Promise<
   });
 }
 
+const lastAiredSchema = z.object({
+  last_episode_to_air: z
+    .object({
+      season_number: z.number(),
+      episode_number: z.number(),
+      air_date: z.string().nullish(),
+      name: z.string().nullish(),
+    })
+    .nullish(),
+});
+
+export interface AiredEpisode {
+  season: number;
+  episode: number;
+  /** AAAA-MM-JJ */
+  airDate: string | null;
+  name: string | null;
+}
+
+/** Dernier épisode diffusé d'une série (cache 6 h). */
+export async function lastAiredEpisode(tmdbId: number): Promise<AiredEpisode | null> {
+  return cached(`tmdb:last-aired:${tmdbId}`, 6 * 60 * 60, async () => {
+    const d = lastAiredSchema.parse(await tmdbGet(`/tv/${tmdbId}`, { language: LANG }));
+    const e = d.last_episode_to_air;
+    if (!e || e.season_number < 1) return null;
+    return {
+      season: e.season_number,
+      episode: e.episode_number,
+      airDate: e.air_date ?? null,
+      name: e.name ?? null,
+    };
+  });
+}
+
+/** Diffusé il y a moins de `days` jours (dates TMDB sans heure, comparées en UTC). */
+export function airedWithin(airDate: string | null, days: number, now = Date.now()): boolean {
+  if (!airDate) return false;
+  const t = Date.parse(`${airDate}T00:00:00Z`);
+  return Number.isFinite(t) && t <= now && now - t <= days * 86_400_000;
+}
+
 /** Sonde de santé : TMDB répond-il avec la clé configurée ? (pas de cache base) */
 export async function pingTmdb(): Promise<boolean> {
   await tmdbGet("/configuration");

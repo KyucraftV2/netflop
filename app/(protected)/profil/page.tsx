@@ -8,6 +8,8 @@ import { requirePageUser } from "@/lib/auth-guard";
 import { browserStateForSlug } from "@/lib/browser-lifecycle";
 import { getDb } from "@/lib/db";
 import { userSubscriptions, users } from "@/lib/db/schema";
+import { pushConfig } from "@/lib/push";
+import { NotificationsForm } from "./notifications-form";
 import { BrowserCard, PauseForm, QualityForm, SubscriptionsForm } from "./profile-forms";
 import { getConfig } from "@/lib/config";
 import { enabledPlatformIds } from "@/lib/platforms";
@@ -20,7 +22,12 @@ export default async function ProfilePage() {
   const [subs, [row]] = await Promise.all([
     db.select().from(userSubscriptions).where(eq(userSubscriptions.userId, user.id)),
     db
-      .select({ videoQuality: users.videoQuality, pausedStopMinutes: users.pausedStopMinutes })
+      .select({
+        videoQuality: users.videoQuality,
+        pausedStopMinutes: users.pausedStopMinutes,
+        notifyNewEpisodes: users.notifyNewEpisodes,
+        notifyQueue: users.notifyQueue,
+      })
       .from(users)
       .where(eq(users.id, user.id)),
   ]);
@@ -67,6 +74,19 @@ export default async function ProfilePage() {
           enregistrée.
         </p>
         <PauseForm initial={row?.pausedStopMinutes ?? null} max={getConfig().PAUSED_STOP_MINUTES} />
+      </section>
+
+      <section aria-labelledby="notifications" className="mt-12">
+        <h2 id="notifications" className="text-xl font-semibold">
+          Notifications
+        </h2>
+        <NotificationsForm
+          publicKey={pushConfig()?.publicKey ?? null}
+          initial={{
+            newEpisodes: row?.notifyNewEpisodes ?? true,
+            queue: row?.notifyQueue ?? true,
+          }}
+        />
       </section>
 
       <section className="mt-12 border-t border-white/10 pt-8">

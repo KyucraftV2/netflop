@@ -1,4 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
+import webpush from "web-push";
+
+// Clés VAPID jetables : active la section Notifications du profil pendant les tests.
+const vapid = webpush.generateVAPIDKeys();
 
 const PORT = 3200;
 const E2E_DATABASE_URL =
@@ -53,6 +57,8 @@ export default defineConfig({
         TMDB_API_KEY: "e2e-key",
         TMDB_API_BASE_URL: "http://127.0.0.1:3999",
         JUSTWATCH_ENABLED: "false",
+        VAPID_PUBLIC_KEY: vapid.publicKey,
+        VAPID_PRIVATE_KEY: vapid.privateKey,
       },
     },
   ],

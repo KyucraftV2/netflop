@@ -155,6 +155,26 @@ test("sondes d'exploitation fermées sans jeton", async ({ request }) => {
   expect((await request.get("/api/metrics")).status()).toBe(404);
 });
 
+test("notifications : section du profil, endpoint de push contrôlé", async ({ page }) => {
+  await login(page);
+  await page.goto("/profil");
+  await expect(page.getByRole("heading", { name: "Notifications" })).toBeVisible();
+  await expect(page.getByRole("switch", { name: /Nouveaux épisodes/ })).toBeChecked();
+  // Un endpoint qui n'est pas un service de push connu est refusé (pas de requête serveur).
+  const status = await page.evaluate(async () => {
+    const res = await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        endpoint: "https://docker-proxy:2375/containers/json",
+        keys: { p256dh: "BNcRdreALRFXTkOOUHK1EtK2", auth: "tBHItJI5svbpez7K" },
+      }),
+    });
+    return res.status;
+  });
+  expect(status).toBe(400);
+});
+
 test("pages protégées : historique, profil, admin, 404", async ({ page }) => {
   await login(page);
   await page.goto("/historique");

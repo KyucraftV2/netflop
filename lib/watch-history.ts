@@ -3,7 +3,9 @@ import { getDb } from "./db";
 import { watchProgress, watchSamples, type WatchProgress } from "./db/schema";
 import { errorMessage, logger } from "./log";
 import type { PlatformId } from "./platforms";
-import { nextEpisode, titleDetails, type MediaType } from "./tmdb";
+import { airedWithin, lastAiredEpisode, nextEpisode, titleDetails, type MediaType } from "./tmdb";
+
+const NEW_EPISODE_DAYS = 7;
 import { STARTED_SECONDS } from "./tracker/progress";
 import { removeWatchedMovie } from "./watchlist";
 
@@ -28,6 +30,8 @@ export interface ContinueCard {
   percent: number;
   resumeUrl: string | null;
   lastWatchedAt: Date;
+  /** Épisode suivant sorti depuis moins de 7 jours (badge « Nouvel épisode »). */
+  isNew?: boolean;
 }
 
 function toCard(r: WatchProgress, kind: ContinueCard["kind"]): ContinueCard {
@@ -92,7 +96,14 @@ export async function continueWatching(userId: string, limit = 20): Promise<Cont
     try {
       const next = await nextEpisode(last.tmdbId!, last.season || 1, last.episode || 0);
       if (!next) continue;
+      const aired = await lastAiredEpisode(last.tmdbId!).catch(() => null);
+      const isNew =
+        aired !== null &&
+        aired.season === next.season &&
+        aired.episode === next.episode &&
+        airedWithin(aired.airDate, NEW_EPISODE_DAYS);
       nextCards.push({
+        isNew,
         ...toCard(last, "next"),
         season: next.season,
         episode: next.episode,

@@ -4,6 +4,8 @@ import { getConfig } from "../lib/config";
 import { closeDb } from "../lib/db";
 import { createDockerClient } from "../lib/docker";
 import { errorMessage, logger } from "../lib/log";
+import { notifyNewEpisodes } from "../lib/notifications";
+import { pushConfig } from "../lib/push";
 
 /**
  * Worker Netflop : cycle de vie automatique des navigateurs.
@@ -54,6 +56,20 @@ async function main(): Promise<void> {
         .tick()
         .catch((err: unknown) => log.error("revérification", { error: errorMessage(err) }));
       await sleep(60_000);
+    }
+  })();
+
+  // Notifications « nouvel épisode » : toutes les 6 h (une seule par épisode).
+  void (async () => {
+    if (!pushConfig()) {
+      log.info("notifications push désactivées (VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY absentes)");
+      return;
+    }
+    while (!stopping) {
+      await notifyNewEpisodes().catch((err: unknown) =>
+        log.error("notifications", { error: errorMessage(err) }),
+      );
+      await sleep(6 * 60 * 60 * 1000);
     }
   })();
 

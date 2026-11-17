@@ -53,6 +53,9 @@ export const users = pgTable("user", {
   autoQualityHint: videoQualityEnum("auto_quality_hint"),
   /** Délai avant arrêt sur pause (minutes), plafonné par PAUSED_STOP_MINUTES. NULL = défaut. */
   pausedStopMinutes: integer("paused_stop_minutes"),
+  /** Notifications push : nouveaux épisodes des séries suivies, tour dans la file. */
+  notifyNewEpisodes: boolean("notify_new_episodes").notNull().default(true),
+  notifyQueue: boolean("notify_queue").notNull().default(true),
   onboardedAt: timestamp("onboarded_at", { mode: "date", withTimezone: true }),
   lastLoginAt: timestamp("last_login_at", { mode: "date", withTimezone: true }),
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).notNull().defaultNow(),
@@ -337,3 +340,42 @@ export const browserEvents = pgTable(
 );
 
 export type BrowserEvent = typeof browserEvents.$inferSelect;
+
+/* ------------------------------------------------------------------ */
+/* Notifications push                                                  */
+/* ------------------------------------------------------------------ */
+
+/** Un abonnement Web Push par appareil (navigateur / PWA installée). */
+export const pushSubscriptions = pgTable(
+  "push_subscription",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull().unique(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+    lastSuccessAt: timestamp("last_success_at", { mode: "date", withTimezone: true }),
+  },
+  (t) => [index("push_subscription_user_idx").on(t.userId)],
+);
+
+/** Épisodes déjà annoncés (une notification par épisode et par utilisateur). */
+export const episodeNotifications = pgTable(
+  "episode_notification",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tmdbId: integer("tmdb_id").notNull(),
+    season: integer("season").notNull(),
+    episode: integer("episode").notNull(),
+    sentAt: timestamp("sent_at", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.tmdbId, t.season, t.episode] })],
+);
+
+export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;

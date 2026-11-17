@@ -78,8 +78,13 @@ export function ContinueRow({ cards }: { cards: ContinueCard[] }) {
                     />
                   ) : null}
                   <span className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-                  <span className="absolute top-2 left-2">
+                  <span className="absolute top-2 left-2 flex items-center gap-1.5">
                     <PlatformBadge id={c.platform} />
+                    {c.isNew ? (
+                      <span className="rounded-[4px] bg-white px-1.5 py-0.5 text-[11px] font-bold text-black">
+                        Nouvel épisode
+                      </span>
+                    ) : null}
                   </span>
                   <span className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
                     <span className="flex size-12 items-center justify-center rounded-pill bg-white/90 text-black">
