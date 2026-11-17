@@ -417,3 +417,8 @@ bun run lint && bun run typecheck && bun run format:check
 
 **Attention** : les bases de test (`TEST_DATABASE_URL`, `E2E_DATABASE_URL`) sont **vidées** à
 chaque lancement.
+
+**Intégration continue** (`.github/workflows/ci.yml`) : à chaque PR et à chaque push sur
+`main`, GitHub Actions lance le lint, les types, le format, les tests unitaires et
+d'intégration (Postgres 16), le build et les parcours Playwright. En cas d'échec des
+parcours, les traces sont disponibles en artefact `playwright-traces`.
