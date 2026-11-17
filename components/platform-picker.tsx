@@ -30,7 +30,7 @@ export function PlatformPicker({
               "relative flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-tile border-2 p-4 transition-all has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-white",
               checked ? "border-white" : "border-transparent opacity-70 hover:opacity-100",
             )}
-            style={{ backgroundColor: p.color, color: p.textColor }}
+            style={{ backgroundColor: p.tileColor, color: p.textColor }}
           >
             <input
               type="checkbox"

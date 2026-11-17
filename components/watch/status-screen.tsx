@@ -35,7 +35,7 @@ export function StatusScreen({
     >
       <div
         className="flex h-16 w-44 items-center justify-center rounded-tile shadow-pop"
-        style={{ backgroundColor: p.color }}
+        style={{ backgroundColor: p.tileColor }}
       >
         <Image src={p.logo} alt={p.name} width={140} height={42} className="h-8 w-auto" />
       </div>

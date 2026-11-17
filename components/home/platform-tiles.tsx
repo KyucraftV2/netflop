@@ -52,7 +52,11 @@ export function PlatformTiles({
                   "group relative flex aspect-video flex-col items-center justify-center gap-2 overflow-hidden rounded-tile p-4 shadow-card transition-transform duration-200 ease-netflop motion-safe:hover:scale-[1.04] motion-safe:focus-visible:scale-[1.04]",
                   !subscribed.includes(p.id) && "opacity-60",
                 )}
-                style={{ backgroundColor: p.color, color: p.textColor }}
+                style={{
+                  backgroundColor: p.tileColor,
+                  color: p.textColor,
+                  boxShadow: `inset 0 -4px 0 ${p.color}`,
+                }}
                 aria-label={`Regarder ${p.name}${p.tagline ? ` (${p.tagline})` : ""}`}
               >
                 <span

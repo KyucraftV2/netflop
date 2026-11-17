@@ -25,8 +25,11 @@ export interface Platform {
   homeUrl: string;
   /** Modèle d'URL de recherche ; {q} = titre encodé. À vérifier à la main. */
   searchUrlTemplate: string;
+  /** Couleur des badges (texte `textColor` dessus). */
   color: string;
   textColor: string;
+  /** Fond des surfaces qui affichent le logo (tuiles, écrans de lecture) : contraste avec le logo. */
+  tileColor: string;
   /** Logo (dans public/), utilisé UNIQUEMENT sur les tuiles et badges. */
   logo: string;
   /**
@@ -53,6 +56,7 @@ export const PLATFORMS: Record<PlatformId, Platform> = {
     searchUrlTemplate: "https://www.netflix.com/search?q={q}",
     color: "#b20710",
     textColor: "#ffffff",
+    tileColor: "#000000",
     logo: "/platforms/netflix.svg",
     tmdbProviderNamePatterns: [/^netflix\b/],
     allowedDomains: ["netflix.com", "nflxext.com", "nflxvideo.net", "nflximg.net"],
@@ -71,6 +75,7 @@ export const PLATFORMS: Record<PlatformId, Platform> = {
     searchUrlTemplate: "https://www.canalplus.com/recherche/?q={q}",
     color: "#111111",
     textColor: "#ffffff",
+    tileColor: "#000000",
     logo: "/platforms/canalplus.svg",
     // Canal+ regroupe les contenus HBO Max et Apple TV+ (regardés via Canal+).
     tmdbProviderNamePatterns: [
@@ -98,6 +103,7 @@ export const PLATFORMS: Record<PlatformId, Platform> = {
     searchUrlTemplate: "https://www.france.tv/recherche/?q={q}",
     color: "#1d3fbb",
     textColor: "#ffffff",
+    tileColor: "#0b1533",
     logo: "/platforms/francetv.svg",
     tmdbProviderNamePatterns: [/^france\.?\s?tv/],
     allowedDomains: ["france.tv", "francetv.fr", "ftven.fr"],

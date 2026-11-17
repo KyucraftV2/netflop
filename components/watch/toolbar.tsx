@@ -156,7 +156,7 @@ export function Toolbar({
           </Button>
           <span
             className="hidden h-7 items-center rounded-[4px] px-2 sm:flex"
-            style={{ backgroundColor: p.color }}
+            style={{ backgroundColor: p.tileColor }}
           >
             <Image src={p.logo} alt={p.name} width={80} height={24} className="h-4 w-auto" />
           </span>
