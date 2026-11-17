@@ -1,0 +1,31 @@
+name: Sauvegardes
+
+# Sauvegarde chiffrée puis restauration sur un vrai Docker (service db de docker-compose.yml).
+on:
+  pull_request:
+    paths:
+      - scripts/backup*.sh
+      - scripts/restore.sh
+      - scripts/test-backup.sh
+      - drizzle/**
+      - docker-compose.yml
+      - .github/workflows/sauvegardes.yml
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sauvegarde-restauration:
+    name: Sauvegarde puis restauration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq age shellcheck
+      - run: shellcheck -x scripts/backup.sh scripts/backup-lib.sh scripts/restore.sh scripts/test-backup.sh
+      - run: scripts/test-backup.sh
+      - if: always()
+        run: docker compose down -v || true

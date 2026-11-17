@@ -1,0 +1,13 @@
+# Sauvegarde Netflop (lancée par netflop-backup.timer).
+# Installation : voir README, section « Sauvegarde et restauration ».
+[Unit]
+Description=Sauvegarde Netflop (base + profils Chrome)
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+# Remplacer /srv/netflop par le dossier du dépôt.
+ExecStart=/srv/netflop/scripts/backup.sh /var/backups/netflop
+Nice=10
+IOSchedulingClass=idle
