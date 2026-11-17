@@ -104,6 +104,17 @@ test("recherche, filtre « mes abonnements » puis lancement de lecture simulé"
   await expect(page).toHaveURL(/\/$/);
 });
 
+test("Pour toi : recommandations disponibles sur mes abonnements", async ({ page }) => {
+  await login(page);
+  await page.goto("/");
+  const row = page.getByRole("region", { name: "Pour toi" });
+  await expect(row.getByRole("button", { name: /^Game of Thrones.*canalplus/ })).toBeVisible();
+  await expect(row.getByRole("button", { name: /^The Witcher.*netflix/ })).toBeVisible();
+  // Disney+ n'est pas un abonnement d'Alice, et The Last Kingdom est déjà en cours.
+  await expect(row.getByRole("button", { name: /^Last Night in Soho/ })).toHaveCount(0);
+  await expect(row.getByRole("button", { name: /^The Last Kingdom/ })).toHaveCount(0);
+});
+
 test("Ma liste : ajout depuis la recherche, rangée sur l'accueil, retrait", async ({ page }) => {
   await login(page);
   await page.goto("/?q=last");

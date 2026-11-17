@@ -240,6 +240,18 @@ export async function searchTitles(query: string, page = 1): Promise<SearchResul
   }));
 }
 
+export const RECOMMENDATIONS_TTL = 24 * 60 * 60;
+
+/** Titres recommandés par TMDB à partir d'un titre (même type), cache 24 h. */
+export async function recommendations(type: MediaType, tmdbId: number): Promise<TitleSummary[]> {
+  return cached(`tmdb:reco:${type}:${tmdbId}`, RECOMMENDATIONS_TTL, async () => {
+    const data = pageSchema.parse(
+      await tmdbGet(`/${type}/${tmdbId}/recommendations`, { language: LANG, page: 1 }),
+    );
+    return parseItems(data.results, type);
+  });
+}
+
 /** Recherche typée (film OU série) — utilisée par l'identification du suivi (étape 5). */
 export async function searchByType(type: MediaType, query: string): Promise<TitleSummary[]> {
   const q = query.trim().slice(0, 100);
