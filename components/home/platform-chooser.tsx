@@ -41,7 +41,7 @@ export function PlatformChooser({
                       "flex min-h-14 w-full items-center gap-3 rounded-card px-4 text-left transition-transform motion-safe:hover:scale-[1.02]",
                       !subscribed.includes(id) && "opacity-60",
                     )}
-                    style={{ backgroundColor: p.color, color: p.textColor }}
+                    style={{ backgroundColor: p.tileColor, color: p.textColor }}
                   >
                     <Image src={p.logo} alt="" width={100} height={30} className="h-6 w-auto" />
                     <span className="ml-auto text-xs">
