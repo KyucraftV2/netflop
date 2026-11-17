@@ -178,7 +178,7 @@ networks:
     internal: true
   # Navigateurs + hub (.2) + worker (.3) + Traefik (à connecter, voir README).
   # Les navigateurs ne sont sur AUCUN autre réseau : ils ne voient ni Postgres,
-  # ni docker-proxy, ni les autres services du VPS présents sur le réseau Traefik.
+  # ni docker-proxy, ni les autres services de la machine présents sur le réseau Traefik.
   browsers:
     name: netflop-browsers
     driver: bridge
