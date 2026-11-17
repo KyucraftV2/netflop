@@ -2,7 +2,7 @@
 
 import { Check } from "lucide-react";
 import Image from "next/image";
-import { PLATFORM_LIST, type PlatformId } from "@/lib/platforms";
+import { PLATFORMS, type PlatformId } from "@/lib/platforms";
 import { cn } from "@/lib/utils";
 
 /** Sélection multiple des plateformes (cases à cocher accessibles). */
@@ -10,7 +10,10 @@ export function PlatformPicker({
   value,
   onChange,
   disabled,
+  platforms,
 }: {
+  /** Plateformes proposées (activées sur l'instance). */
+  platforms: PlatformId[];
   value: PlatformId[];
   onChange: (next: PlatformId[]) => void;
   disabled?: boolean;
@@ -21,7 +24,8 @@ export function PlatformPicker({
   return (
     <fieldset className="grid grid-cols-1 gap-3 sm:grid-cols-3" disabled={disabled}>
       <legend className="sr-only">Tes abonnements</legend>
-      {PLATFORM_LIST.map((p) => {
+      {platforms.map((id) => {
+        const p = PLATFORMS[id];
         const checked = value.includes(p.id);
         return (
           <label

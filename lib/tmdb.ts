@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { cached } from "./cache";
 import { errorMessage, logger } from "./log";
-import { platformForProviderName, type PlatformId } from "./platforms";
+import { enabledPlatformIds, platformForProviderName, type PlatformId } from "./platforms";
 
 /**
  * Client TMDB — SERVEUR UNIQUEMENT. La clé (TMDB_API_KEY) n'est jamais envoyée au
@@ -176,23 +176,29 @@ export async function providerPlatformMap(): Promise<Map<number, PlatformId>> {
   return map;
 }
 
-/** Plateformes Netflop proposant le titre en abonnement (flatrate) en France. */
+/**
+ * Plateformes Netflop proposant le titre en France : inclus dans l'abonnement (flatrate)
+ * ou gratuit (free, ads : ARTE, TF1+, M6+, france.tv…). Pas d'achat ni de location.
+ * Seules les plateformes activées (NETFLOP_PLATFORMS) sont renvoyées.
+ */
 export async function titlePlatforms(type: MediaType, tmdbId: number): Promise<PlatformId[]> {
   const [map, raw] = await Promise.all([
     providerPlatformMap(),
     cached(`tmdb:wp:${type}:${tmdbId}`, PROVIDERS_TTL, () =>
-      tmdbGet<{ results?: Record<string, { flatrate?: unknown[] }> }>(
-        `/${type}/${tmdbId}/watch/providers`,
-      ),
+      tmdbGet<{
+        results?: Record<string, { flatrate?: unknown[]; free?: unknown[]; ads?: unknown[] }>;
+      }>(`/${type}/${tmdbId}/watch/providers`),
     ),
   ]);
-  const flatrate = raw?.results?.[REGION]?.flatrate ?? [];
+  const region = raw?.results?.[REGION];
+  const offers = [...(region?.flatrate ?? []), ...(region?.free ?? []), ...(region?.ads ?? [])];
+  const enabled = new Set(enabledPlatformIds());
   const out = new Set<PlatformId>();
-  for (const f of flatrate) {
+  for (const f of offers) {
     const p = providerSchema.safeParse(f);
     if (!p.success) continue;
     const platform = map.get(p.data.provider_id) ?? platformForProviderName(p.data.provider_name);
-    if (platform) out.add(platform);
+    if (platform && enabled.has(platform)) out.add(platform);
   }
   return [...out];
 }

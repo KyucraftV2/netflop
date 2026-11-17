@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { PlatformBadge } from "@/components/platform-badge";
 import { requirePageUser } from "@/lib/auth-guard";
-import { isPlatformId, PLATFORM_LIST } from "@/lib/platforms";
+import { enabledPlatforms, isPlatformId } from "@/lib/platforms";
 import { cn, episodeLabel, formatDateTime } from "@/lib/utils";
 import { historyFor, toConfirmFor } from "@/lib/watch-history";
 import { ClearHistoryButton, ConfirmEntry, EntryActions } from "./history-client";
@@ -82,7 +82,7 @@ export default async function HistoryPage({
 
       <nav aria-label="Filtrer par plateforme" className="mt-10 flex flex-wrap gap-2">
         {chip("/historique", "Toutes", !platform)}
-        {PLATFORM_LIST.map((p) =>
+        {enabledPlatforms().map((p) =>
           chip(`/historique?plateforme=${p.id}`, p.name, platform === p.id),
         )}
       </nav>

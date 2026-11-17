@@ -29,7 +29,13 @@ function Feedback({ msg }: { msg: { ok: boolean; text: string } | null }) {
   );
 }
 
-export function SubscriptionsForm({ initial }: { initial: PlatformId[] }) {
+export function SubscriptionsForm({
+  initial,
+  available,
+}: {
+  initial: PlatformId[];
+  available: PlatformId[];
+}) {
   const [value, setValue] = useState<PlatformId[]>(initial);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
@@ -46,7 +52,7 @@ export function SubscriptionsForm({ initial }: { initial: PlatformId[] }) {
         });
       }}
     >
-      <PlatformPicker value={value} onChange={setValue} disabled={pending} />
+      <PlatformPicker platforms={available} value={value} onChange={setValue} disabled={pending} />
       <Button type="submit" className="mt-4" disabled={pending}>
         {pending ? "Enregistrement…" : "Enregistrer"}
       </Button>

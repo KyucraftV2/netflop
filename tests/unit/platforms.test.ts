@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  enabledPlatformIds,
   isPlaybackUrl,
   platformForProviderName,
   platformSearchUrl,
@@ -19,12 +20,19 @@ describe("correspondance fournisseurs → plateformes", () => {
     ["Apple TV", "canalplus"],
     ["france.tv", "francetv"],
     ["France TV", "francetv"],
+    ["Amazon Prime Video", "primevideo"],
+    ["Amazon Prime Video with Ads", "primevideo"],
+    ["Disney Plus", "disneyplus"],
+    ["Arte", "arte"],
+    ["TF1+", "tf1plus"],
+    ["M6+", "m6plus"],
+    ["6play", "m6plus"],
   ])("%s → %s", (name, id) => expect(platformForProviderName(name)).toBe(id));
 
   it.each([
-    "Amazon Prime Video",
-    "Disney Plus",
     "Apple TV Store",
+    "Amazon Video",
+    "Disney Plus Amazon Channel",
     "HBO Max Amazon Channel",
     "Maxdome",
   ])("%s → null", (name) => expect(platformForProviderName(name)).toBeNull());
@@ -76,5 +84,39 @@ describe("URL de recherche", () => {
     expect(platformSearchUrl("netflix", "Lupin & co")).toBe(
       "https://www.netflix.com/search?q=Lupin%20%26%20co",
     );
+  });
+});
+
+describe("plateformes activées (NETFLOP_PLATFORMS)", () => {
+  it("vide ou invalide → toutes", () => {
+    expect(enabledPlatformIds("")).toHaveLength(8);
+    expect(enabledPlatformIds(undefined)).toHaveLength(8);
+    expect(enabledPlatformIds("youtube, ,")).toHaveLength(8);
+  });
+
+  it("liste explicite, ordre canonique, sans doublon ni inconnu", () => {
+    expect(enabledPlatformIds(" arte,Netflix,arte,youtube ")).toEqual(["netflix", "arte"]);
+  });
+});
+
+describe("nouvelles plateformes : URL de lecture", () => {
+  it.each([
+    ["arte", "https://www.arte.tv/fr/videos/110342-001-A/une-serie/", true],
+    ["arte", "https://www.arte.tv/fr/", false],
+    ["disneyplus", "https://www.disneyplus.com/fr-fr/video/5f2a5c1e-1234", true],
+    ["disneyplus", "https://www.disneyplus.com/fr-fr/home", false],
+    ["tf1plus", "https://www.tf1.fr/tf1/une-serie/videos/episode-1-123.html", true],
+    ["m6plus", "https://www.m6.fr/", false],
+    ["m6plus", "https://www.m6.fr/une-serie-p_123/videos/episode-1", true],
+  ] as const)("%s %s → %s", (id, url, expected) => {
+    expect(isPlaybackUrl(id, url)).toBe(expected);
+  });
+
+  it("navigation vers les domaines des nouvelles plateformes", () => {
+    expect(validateNavigationUrl("https://www.primevideo.com/detail/0ABC/")?.platform).toBe(
+      "primevideo",
+    );
+    expect(validateNavigationUrl("https://www.arte.tv/fr/")?.platform).toBe("arte");
+    expect(validateNavigationUrl("https://www.tf1.fr.evil.io/")).toBeNull();
   });
 });

@@ -104,7 +104,7 @@ const responseSchema = z.object({
 });
 type JwResponse = z.infer<typeof responseSchema>;
 
-/** Extrait d'une réponse JustWatch le lien flatrate du titre (tmdbId) pour la plateforme. */
+/** Extrait d'une réponse JustWatch le lien (abonnement ou gratuit) du titre (tmdbId) pour la plateforme. */
 export function pickOfferUrl(
   response: JwResponse,
   tmdbId: number,
@@ -117,7 +117,7 @@ export function pickOfferUrl(
     if (node.objectType !== wantedType) continue;
     if (node.content.externalIds?.tmdbId !== String(tmdbId)) continue;
     for (const offer of node.offers ?? []) {
-      if (!offer.monetizationType.startsWith("FLATRATE")) continue;
+      if (!/^(FLATRATE|FREE|ADS)/.test(offer.monetizationType)) continue;
       if (platformForProviderName(offer.package.clearName) !== platform) continue;
       const url = offer.standardWebURL;
       if (url && validateNavigationUrl(url)?.platform === platform) return url;
