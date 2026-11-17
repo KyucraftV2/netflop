@@ -10,6 +10,7 @@ import { RotateHint } from "./rotate-hint";
 import { SoundOverlay } from "./sound-overlay";
 import { StatusScreen, type ScreenKind } from "./status-screen";
 import { StillWatchingDialog } from "./still-watching-dialog";
+import type { SleepChoice } from "./sleep-menu";
 import { Toolbar } from "./toolbar";
 
 const HEARTBEAT_MS = 20_000;
@@ -173,6 +174,15 @@ export function WatchClient({
     setStatus((s) => (s && "stillWatchingPrompt" in s ? { ...s, stillWatchingPrompt: false } : s));
   }, []);
 
+  const chooseSleep = useCallback(async (c: SleepChoice) => {
+    const sleep =
+      "minutes" in c
+        ? { at: new Date(Date.now() + c.minutes * 60_000).toISOString(), afterEpisode: false }
+        : { at: null, afterEpisode: c.mode === "episode" };
+    setStatus((s) => (s && "sleep" in s ? { ...s, sleep } : s)); // optimiste
+    await browserApi.sleep(c).catch(() => setError("Minuteur indisponible pour le moment."));
+  }, []);
+
   const retry = useCallback(async () => {
     setStatus(null);
     setFrameLoaded(false);
@@ -238,6 +248,8 @@ export function WatchClient({
         onKeyboard={() => setKeyboardOpen((o) => !o)}
         keyboardOpen={keyboardOpen}
         canUseBrowser={ready && !screen}
+        sleep={active?.sleep ?? null}
+        onSleep={(c) => void chooseSleep(c)}
       />
 
       {ready && !screen ? <SoundOverlay frameRef={frameRef} /> : null}

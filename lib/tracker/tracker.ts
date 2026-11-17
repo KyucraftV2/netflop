@@ -9,7 +9,7 @@ import { errorMessage, logger } from "../log";
 import { isPlaybackUrl, PLATFORMS, platformForUrl, type PlatformId } from "../platforms";
 import { identify, type Candidate } from "./identify";
 import { buildProbeExpression, type ProbeResult } from "./probe";
-import { decide, shouldStopForPause, type TrackState } from "./progress";
+import { decide, effectivePauseMinutes, shouldStopForPause, type TrackState } from "./progress";
 import { CONFIDENCE_THRESHOLD, resolveCandidate, type Resolved } from "./resolve";
 import { removeWatchedMovie } from "../watchlist";
 
@@ -164,14 +164,14 @@ export function createTracker(lc: Lifecycle) {
   async function sample(
     session: BrowserSession,
     slug: string,
-    opts: { final?: boolean } = {},
-  ): Promise<{ stopForPause: boolean }> {
+    opts: { final?: boolean; pausedStopMinutes?: number | null } = {},
+  ): Promise<{ stopForPause: boolean; stopForSleep: boolean }> {
     const now = Date.now();
     const obs = await observe(session);
     const prev = states.get(session.id);
     if (!obs) {
       states.set(session.id, decide(prev, "∅", null, now).next);
-      return { stopForPause: false };
+      return { stopForPause: false, stopForSleep: false };
     }
 
     const c = identify({
@@ -209,7 +209,16 @@ export function createTracker(lc: Lifecycle) {
     }
 
     return {
-      stopForPause: !opts.final && shouldStopForPause(d.next, now, getConfig().PAUSED_STOP_MINUTES),
+      stopForPause:
+        !opts.final &&
+        shouldStopForPause(
+          d.next,
+          now,
+          effectivePauseMinutes(opts.pausedStopMinutes, getConfig().PAUSED_STOP_MINUTES),
+        ),
+      // Minuteur « fin de l'épisode » : le contenu en cours vient d'être terminé.
+      stopForSleep:
+        !opts.final && session.sleepAfterEpisode && d.completed && obs.probe.video !== null,
     };
   }
 
@@ -217,12 +226,15 @@ export function createTracker(lc: Lifecycle) {
   async function tick(): Promise<void> {
     const sessions = await lc.activeSessions();
     const alive = new Set<string>();
-    for (const { session, slug } of sessions) {
+    for (const { session, slug, pausedStopMinutes } of sessions) {
       alive.add(session.id);
       if (session.status !== "ready") continue;
       try {
-        const { stopForPause } = await sample(session, slug);
-        if (stopForPause) {
+        const { stopForPause, stopForSleep } = await sample(session, slug, { pausedStopMinutes });
+        if (stopForSleep) {
+          log.info("minuteur : fin de l'épisode, arrêt du navigateur", { user: slug });
+          await lc.stopSession(session, slug, "minuteur de sommeil (fin de l'épisode)");
+        } else if (stopForPause) {
           log.info("pause prolongée : arrêt du navigateur", { user: slug });
           await lc.stopSession(session, slug, "pause prolongée");
         }

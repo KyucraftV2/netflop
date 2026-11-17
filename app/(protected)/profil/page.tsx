@@ -8,7 +8,8 @@ import { requirePageUser } from "@/lib/auth-guard";
 import { browserStateForSlug } from "@/lib/browser-lifecycle";
 import { getDb } from "@/lib/db";
 import { userSubscriptions, users } from "@/lib/db/schema";
-import { BrowserCard, QualityForm, SubscriptionsForm } from "./profile-forms";
+import { BrowserCard, PauseForm, QualityForm, SubscriptionsForm } from "./profile-forms";
+import { getConfig } from "@/lib/config";
 
 export const metadata: Metadata = { title: "Profil" };
 
@@ -17,7 +18,10 @@ export default async function ProfilePage() {
   const db = getDb();
   const [subs, [row]] = await Promise.all([
     db.select().from(userSubscriptions).where(eq(userSubscriptions.userId, user.id)),
-    db.select({ videoQuality: users.videoQuality }).from(users).where(eq(users.id, user.id)),
+    db
+      .select({ videoQuality: users.videoQuality, pausedStopMinutes: users.pausedStopMinutes })
+      .from(users)
+      .where(eq(users.id, user.id)),
   ]);
 
   return (
@@ -51,6 +55,17 @@ export default async function ProfilePage() {
           Qualité vidéo
         </h2>
         <QualityForm initial={row?.videoQuality ?? "normal"} />
+      </section>
+
+      <section aria-labelledby="pause" className="mt-12">
+        <h2 id="pause" className="text-xl font-semibold">
+          Pause prolongée
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          Une vidéo en pause trop longtemps libère le navigateur pour les autres. Ta progression est
+          enregistrée.
+        </p>
+        <PauseForm initial={row?.pausedStopMinutes ?? null} max={getConfig().PAUSED_STOP_MINUTES} />
       </section>
 
       <section className="mt-12 border-t border-white/10 pt-8">

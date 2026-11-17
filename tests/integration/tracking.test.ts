@@ -74,6 +74,7 @@ describe.skipIf(!TEST_DB_URL)("suivi de visionnage (Postgres réel, Chrome simul
   beforeAll(async () => {
     process.env.DATABASE_URL = TEST_DB_URL;
     process.env.TRAEFIK_NETWORK = "traefik";
+    process.env.HUB_DOMAIN = "netflop.example.com";
     process.env.PUBLIC_IP = "203.0.113.10";
     process.env.SLOT_PORTS = "52000,52001,52002";
     ({ db, close } = await setupDb());
@@ -163,6 +164,40 @@ describe.skipIf(!TEST_DB_URL)("suivi de visionnage (Postgres réel, Chrome simul
     await tracker.tick();
     const cards = await history.continueWatching(ids.alice!);
     expect(cards[0]).toMatchObject({ kind: "next", season: 1, episode: 4 });
+  });
+
+  it("minuteur « fin de l'épisode » : arrêt quand l'épisode se termine", async () => {
+    const { lc, tracker } = await setup();
+    await lc.setSleep(ids.alice!, { kind: "episode" });
+    netflix(1200);
+    await tracker.tick();
+    netflix(1260);
+    await tracker.tick();
+    expect((await lc.status(ids.alice!)).state).toBe("ready");
+    netflix(2450);
+    await tracker.tick();
+    expect((await lc.status(ids.alice!)).state).toBe("off");
+  });
+
+  it("délai de pause personnel (plus court que celui de l'admin)", async () => {
+    const { users } = await import("@/lib/db/schema");
+    await db.update(users).set({ pausedStopMinutes: 10 }).where(eq(users.id, ids.alice!));
+    const { lc, tracker } = await setup();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      netflix(100);
+      await tracker.tick();
+      netflix(200);
+      await tracker.tick();
+      netflix(260, { paused: true });
+      await tracker.tick();
+      vi.setSystemTime(Date.now() + 11 * 60_000);
+      await lc.heartbeat(ids.alice!);
+      await tracker.tick();
+      expect((await lc.status(ids.alice!)).state).toBe("off");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("dernière capture enregistrée avant l'arrêt du navigateur", async () => {

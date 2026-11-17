@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { requireUser } from "@/lib/auth-guard";
-import { startAndOpen } from "@/lib/browser-service";
+import { rememberConnectionHint, startAndOpen } from "@/lib/browser-service";
 import { parseJson, route } from "@/lib/http";
 import { logger } from "@/lib/log";
 import { titleUrl } from "@/lib/open-url";
@@ -20,6 +20,8 @@ const bodySchema = z
     episode: z.number().int().min(0).max(5000).optional(),
     /** URL de reprise connue (« Continuer à regarder ») : revalidée par liste blanche. */
     resumeUrl: z.string().url().max(2000).optional(),
+    /** Estimation de la connexion (qualité « auto »). */
+    connection: z.enum(["fast", "slow"]).optional(),
   })
   .strict();
 
@@ -30,6 +32,7 @@ const bodySchema = z
 export const POST = route(async (req: Request) => {
   const user = await requireUser();
   const body = await parseJson(req, bodySchema);
+  if (body.connection) await rememberConnectionHint(user.id, body.connection);
 
   let target: { url: string; source: string };
   const resume = body.resumeUrl ? validateNavigationUrl(body.resumeUrl) : null;

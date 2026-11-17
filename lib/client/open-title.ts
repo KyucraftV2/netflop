@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import type { PlatformId } from "@/lib/platforms";
+import { connectionHint } from "./connection";
 
 export interface OpenTitleInput {
   platform: PlatformId;
@@ -28,7 +29,7 @@ export function useOpenTitle() {
         const res = await fetch("/api/browser/open", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(input),
+          body: JSON.stringify({ ...input, connection: connectionHint() }),
         });
         if (!res.ok) throw new Error(String(res.status));
         const data = (await res.json()) as { watchUrl: string };

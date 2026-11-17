@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import { Button } from "@/components/ui/button";
 import { PLATFORMS, type PlatformId } from "@/lib/platforms";
 import { cn } from "@/lib/utils";
+import { SleepMenu, type SleepChoice, type SleepState } from "./sleep-menu";
 
 const HIDE_AFTER_MS = 3_000;
 
@@ -29,6 +30,8 @@ export function Toolbar({
   onKeyboard,
   keyboardOpen,
   canUseBrowser,
+  sleep,
+  onSleep,
 }: {
   platform: PlatformId;
   title: string | null;
@@ -37,6 +40,8 @@ export function Toolbar({
   onKeyboard: () => void;
   keyboardOpen: boolean;
   canUseBrowser: boolean;
+  sleep: SleepState | null;
+  onSleep: (c: SleepChoice) => void;
 }) {
   const p = PLATFORMS[platform];
   const [visible, setVisible] = useState(true);
@@ -97,6 +102,40 @@ export function Toolbar({
     };
   }, []);
 
+  // Raccourcis clavier (ordinateur) : Alt+Maj+F plein écran, Alt+Maj+K clavier, Alt+Maj+Q quitter.
+  // Écoutés aussi dans l'iframe Neko (même origine), en capture pour ne pas les transmettre
+  // au Chrome distant.
+  const actions = useRef({ fullscreen: () => {}, keyboard: onKeyboard, quit: onQuit });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey) return;
+      const a = actions.current;
+      const fn = { KeyF: a.fullscreen, KeyK: a.keyboard, KeyQ: a.quit }[e.code];
+      if (!fn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      fn();
+    };
+    let frameWin: Window | null = null;
+    const hook = () => {
+      frameWin?.removeEventListener("keydown", onKey, true);
+      try {
+        frameWin = containerRef.current?.querySelector("iframe")?.contentWindow ?? null;
+        frameWin?.addEventListener("keydown", onKey, true);
+      } catch {
+        frameWin = null;
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    const id = window.setInterval(hook, 2_000);
+    hook();
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      frameWin?.removeEventListener("keydown", onKey, true);
+      window.clearInterval(id);
+    };
+  }, [containerRef]);
+
   const toggleFullscreen = async () => {
     const d = document as FsDocument;
     if (d.fullscreenElement ?? d.webkitFullscreenElement) {
@@ -121,6 +160,14 @@ export function Toolbar({
       /* refusé par le navigateur */
     }
   };
+
+  useEffect(() => {
+    actions.current = {
+      fullscreen: () => void toggleFullscreen(),
+      keyboard: onKeyboard,
+      quit: onQuit,
+    };
+  });
 
   return (
     <>
@@ -170,18 +217,27 @@ export function Toolbar({
             disabled={!canUseBrowser}
             aria-label="Clavier"
             aria-pressed={keyboardOpen}
+            title="Clavier (Alt+Maj+K)"
           >
             <Keyboard />
           </Button>
+          {sleep ? <SleepMenu sleep={sleep} onChoose={onSleep} disabled={!canUseBrowser} /> : null}
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleFullscreen}
             aria-label={isFs ? "Quitter le plein écran" : "Plein écran"}
+            title={`${isFs ? "Quitter le plein écran" : "Plein écran"} (Alt+Maj+F)`}
           >
             {isFs ? <Minimize /> : <Maximize />}
           </Button>
-          <Button variant="primary" size="sm" className="min-h-11" onClick={onQuit}>
+          <Button
+            variant="primary"
+            size="sm"
+            className="min-h-11"
+            onClick={onQuit}
+            title="Quitter (Alt+Maj+Q)"
+          >
             <X aria-hidden /> Quitter
           </Button>
         </div>

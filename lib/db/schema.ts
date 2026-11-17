@@ -24,7 +24,7 @@ import { PLATFORM_IDS } from "../platforms";
 
 export const platformEnum = pgEnum("platform", PLATFORM_IDS);
 export const roleEnum = pgEnum("role", ["user", "admin"]);
-export const videoQualityEnum = pgEnum("video_quality", ["normal", "saver"]);
+export const videoQualityEnum = pgEnum("video_quality", ["normal", "saver", "auto"]);
 export const browserStatusEnum = pgEnum("browser_status", ["starting", "ready", "stopping"]);
 export const mediaTypeEnum = pgEnum("media_type", ["movie", "tv"]);
 
@@ -49,6 +49,10 @@ export const users = pgTable("user", {
   avatarUrl: text("avatar_url"),
   role: roleEnum("role").notNull().default("user"),
   videoQuality: videoQualityEnum("video_quality").notNull().default("normal"),
+  /** Qualité « auto » : dernière estimation de la connexion envoyée par l'appareil. */
+  autoQualityHint: videoQualityEnum("auto_quality_hint"),
+  /** Délai avant arrêt sur pause (minutes), plafonné par PAUSED_STOP_MINUTES. NULL = défaut. */
+  pausedStopMinutes: integer("paused_stop_minutes"),
   onboardedAt: timestamp("onboarded_at", { mode: "date", withTimezone: true }),
   lastLoginAt: timestamp("last_login_at", { mode: "date", withTimezone: true }),
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).notNull().defaultNow(),
@@ -156,6 +160,10 @@ export const browserSessions = pgTable(
       withTimezone: true,
     }),
     readyAt: timestamp("ready_at", { mode: "date", withTimezone: true }),
+    /** Minuteur de sommeil : arrêt à cette heure… */
+    sleepAt: timestamp("sleep_at", { mode: "date", withTimezone: true }),
+    /** …ou à la fin de l'épisode / du film en cours. */
+    sleepAfterEpisode: boolean("sleep_after_episode").notNull().default(false),
     lastError: text("last_error"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).notNull().defaultNow(),
   },

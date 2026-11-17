@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { resetBrowser, saveSubscriptions, saveVideoQuality } from "@/app/actions/profile";
+import {
+  resetBrowser,
+  savePausedStop,
+  saveSubscriptions,
+  saveVideoQuality,
+} from "@/app/actions/profile";
 import { PlatformPicker } from "@/components/platform-picker";
 import {
   AlertDialog,
@@ -12,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import type { PlatformId } from "@/lib/platforms";
+import { PAUSE_CHOICES } from "@/lib/sleep";
 import { cn } from "@/lib/utils";
 
 function Feedback({ msg }: { msg: { ok: boolean; text: string } | null }) {
@@ -101,16 +107,21 @@ export function BrowserCard({ running }: { running: boolean | null }) {
   );
 }
 
-export function QualityForm({ initial }: { initial: "normal" | "saver" }) {
+export function QualityForm({ initial }: { initial: "normal" | "saver" | "auto" }) {
   const [value, setValue] = useState(initial);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, start] = useTransition();
   const options = [
+    {
+      id: "auto",
+      label: "Automatique",
+      hint: "Selon la connexion de l'appareil au lancement",
+    },
     { id: "normal", label: "Normale (720p)", hint: "Meilleure image" },
-    { id: "saver", label: "Économie de données (480p)", hint: "Débit réduit, idéal en 4G" },
+    { id: "saver", label: "Économie de données (576p)", hint: "Débit réduit, idéal en 4G" },
   ] as const;
   return (
-    <fieldset className="mt-4 grid gap-3 sm:grid-cols-2" disabled={pending}>
+    <fieldset className="mt-4 grid gap-3 sm:grid-cols-3" disabled={pending}>
       <legend className="sr-only">Qualité vidéo</legend>
       {options.map((o) => (
         <label
@@ -142,9 +153,53 @@ export function QualityForm({ initial }: { initial: "normal" | "saver" }) {
           </span>
         </label>
       ))}
-      <div className="sm:col-span-2">
+      <div className="sm:col-span-3">
         <Feedback msg={msg} />
       </div>
     </fieldset>
   );
+}
+
+/** Délai avant l'arrêt automatique quand la vidéo est en pause (plafonné par l'admin). */
+export function PauseForm({ initial, max }: { initial: number | null; max: number }) {
+  const [value, setValue] = useState(initial === null ? "" : String(initial));
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pending, start] = useTransition();
+  const choices = PAUSE_CHOICES.filter((m) => m < max);
+  return (
+    <div className="mt-4">
+      <label htmlFor="pause-delay" className="block text-sm text-muted">
+        Arrêter le navigateur après une pause de
+      </label>
+      <select
+        id="pause-delay"
+        value={value}
+        disabled={pending}
+        onChange={(e) => {
+          const v = e.target.value;
+          setValue(v);
+          start(async () => {
+            const r = await savePausedStop({ minutes: v === "" ? null : Number(v) });
+            setMsg(r.ok ? { ok: true, text: r.message ?? "Fait" } : { ok: false, text: r.error });
+          });
+        }}
+        className="mt-2 min-h-11 w-full rounded-card border border-white/20 bg-surface px-3 sm:w-72"
+      >
+        <option value="">{formatMinutes(max)} (par défaut)</option>
+        {choices.map((m) => (
+          <option key={m} value={m}>
+            {formatMinutes(m)}
+          </option>
+        ))}
+      </select>
+      <Feedback msg={msg} />
+    </div>
+  );
+}
+
+function formatMinutes(m: number): string {
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  const rest = m % 60;
+  return rest ? `${h} h ${rest}` : `${h} h`;
 }
