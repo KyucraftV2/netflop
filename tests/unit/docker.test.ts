@@ -53,7 +53,7 @@ describe("config", () => {
 
   it("refuse une IP publique non remplie", () => {
     expect(() =>
-      parseConfig({ TRAEFIK_NETWORK: "t", PUBLIC_IP: "<VPS_PUBLIC_IP>", SLOT_PORTS: "52000" }),
+      parseConfig({ TRAEFIK_NETWORK: "t", PUBLIC_IP: "<PUBLIC_IP>", SLOT_PORTS: "52000" }),
     ).toThrow(/PUBLIC_IP/);
   });
 });

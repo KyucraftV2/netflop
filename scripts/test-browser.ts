@@ -62,7 +62,7 @@ Navigateur neko-${user} démarré (slot ${info?.slot ?? slot}, port ${cfg.SLOT_P
 - Route Traefik : https://${cfg.HUB_DOMAIN}/b/${user}/
   → doit répondre 401 tant que l'authentification (étape 2) n'est pas en place.
 - Test de lecture via tunnel SSH (depuis ta machine) :
-    ssh -N -L 8080:${ip}:8080 <utilisateur>@<vps>
+    ssh -N -L 8080:${ip}:8080 <utilisateur>@<serveur>
   puis ouvre http://localhost:8080/b/${user}/?usr=${user}&pwd=${password}
 - Relais CDP (interne uniquement) : ${ip}:9223
 - Supprimer : docker compose exec worker node test-browser.js ${user} --rm

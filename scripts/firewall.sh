@@ -44,7 +44,7 @@ status() {
     iptables -S DOCKER-USER 2>/dev/null || echo "(absente)"
     iptables -S "$CHAIN" 2>/dev/null || true
     echo
-    echo "Test depuis TA machine (pas le VPS) :"
+    echo "Test depuis une machine EXTÉRIEURE (pas ce serveur) :"
     echo "  sudo nmap -sU -p ${SLOT_PORTS} <PUBLIC_IP>     # open|filtered attendu quand un navigateur tourne"
     echo "  nmap -Pn -p 5432,2375,9222,9223 <PUBLIC_IP>    # tous doivent être filtered/closed"
 }
