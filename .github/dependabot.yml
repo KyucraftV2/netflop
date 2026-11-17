@@ -1,0 +1,36 @@
+version: 2
+updates:
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      mineures:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "deps"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci"
+
+  - package-ecosystem: docker
+    directories: [/, /browser]
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "docker"
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "docker"

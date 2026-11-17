@@ -93,16 +93,36 @@ Les principales :
 | `AUTH_SECRET`                         | `openssl rand -base64 33`                                            |
 | `TMDB_API_KEY`                        | La clé ou le jeton v4 de ton compte TMDB                             |
 
-### 3. Construire l'image des navigateurs
+### 3. Récupérer les images
+
+Les images sont publiées sur GHCR à chaque mise à jour de `main` (`latest`) et à chaque
+version (`v1.2.3` → tag `1.2.3`) :
 
 ```bash
-docker compose --profile build build browser-image   # Neko + Chrome, environ 2 Go
+docker compose pull                                   # hub, worker, db, docker-proxy
+docker compose --profile build pull browser-image     # Neko + Chrome, environ 2 Go
+```
+
+| Image                                                 | Architectures | Contenu                             |
+| ----------------------------------------------------- | ------------- | ----------------------------------- |
+| `ghcr.io/kyucraftv2/netflop-hub`                      | amd64, arm64  | Hub, worker et migrations           |
+| `ghcr.io/kyucraftv2/netflop-browser`                  | amd64         | Neko + Google Chrome                |
+| `ghcr.io/kyucraftv2/netflop-browser:latest-allowlist` | amd64         | Idem, Chrome limité aux plateformes |
+
+Pour figer une version, renseigne `HUB_IMAGE` et `BROWSER_IMAGE` dans `.env` (par exemple
+`ghcr.io/kyucraftv2/netflop-hub:0.2.0`).
+
+**Build local** (fork, modification du code, machine arm64 pour le navigateur) :
+
+```bash
+docker compose build                                   # hub
+docker compose --profile build build browser-image     # navigateur
 ```
 
 ### 4. Démarrer
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 docker compose ps               # hub et db « healthy », worker et docker-proxy « running »
 docker compose logs migrate     # « migrations appliquées »
 ```
@@ -274,10 +294,14 @@ docker compose exec worker node test-browser.js alice --rm      # le volume est 
 ## Mise à jour
 
 ```bash
-cd netflop && git pull
-docker compose --profile build build --pull browser-image   # nouvelle version Neko/Chrome
-docker compose up -d --build                                # migrations appliquées automatiquement
+cd netflop && git pull                         # docker-compose.yml et .env.example à jour
+docker compose pull
+docker compose --profile build pull browser-image
+docker compose up -d                           # migrations appliquées automatiquement
 ```
+
+En build local, remplace les deux `pull` par `docker compose build --pull` et
+`docker compose --profile build build --pull browser-image`.
 
 Les navigateurs déjà en cours gardent l'ancienne image. La nouvelle s'applique au
 démarrage suivant de chaque navigateur.

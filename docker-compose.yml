@@ -17,7 +17,8 @@ services:
   hub:
     <<: *common
     build: .
-    image: netflop-hub:latest
+    # Image publiée sur GHCR par défaut ; `docker compose build` la reconstruit en local.
+    image: ${HUB_IMAGE:-ghcr.io/kyucraftv2/netflop-hub:latest}
     env_file: .env
     environment:
       DATABASE_URL: postgresql://netflop:${POSTGRES_PASSWORD}@db:5432/netflop
@@ -62,8 +63,7 @@ services:
 
   worker:
     <<: *common
-    image: netflop-hub:latest
-    pull_policy: never # image construite par le service hub
+    image: ${HUB_IMAGE:-ghcr.io/kyucraftv2/netflop-hub:latest}
     command: ["node", "worker.js"]
     env_file: .env
     environment:
@@ -80,8 +80,7 @@ services:
 
   # Applique les migrations versionnées (drizzle/) puis s'arrête.
   migrate:
-    image: netflop-hub:latest
-    pull_policy: never # image construite par le service hub
+    image: ${HUB_IMAGE:-ghcr.io/kyucraftv2/netflop-hub:latest}
     command: ["node", "migrate.js"]
     restart: "no"
     security_opt:
@@ -157,13 +156,14 @@ services:
       internal: {}
 
   # Image des navigateurs (pas un service) :
-  #   docker compose --profile build build browser-image
+  #   docker compose --profile build pull browser-image    # version publiée
+  #   docker compose --profile build build browser-image   # ou build local
   browser-image:
     build:
       context: ./browser
       args:
         NETFLOP_URL_ALLOWLIST: ${NETFLOP_URL_ALLOWLIST:-0}
-    image: netflop-browser:latest
+    image: ${BROWSER_IMAGE:-ghcr.io/kyucraftv2/netflop-browser:latest}
     profiles: ["build"]
 
 networks:

@@ -1,0 +1,108 @@
+name: Images Docker
+
+# PR : construit les images (sans publier) pour vérifier les Dockerfile.
+# main : publie `latest` + `sha-<commit>` sur GHCR. Tag v1.2.3 : publie `1.2.3` et `1.2`.
+on:
+  pull_request:
+    paths:
+      - Dockerfile
+      - browser/**
+      - package.json
+      - bun.lock
+      - .github/workflows/images.yml
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  hub:
+    name: Image du hub
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/netflop-hub
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          # arm64 seulement à la publication (émulation lente).
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=hub
+          cache-to: type=gha,mode=max,scope=hub
+
+  browser:
+    name: Image navigateur (${{ matrix.variant }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - variant: standard
+            allowlist: "0"
+            suffix: ""
+          - variant: liste blanche
+            allowlist: "1"
+            suffix: "-allowlist"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/netflop-browser
+          flavor: suffix=${{ matrix.suffix }},onlatest=true
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./browser
+          # L'image Neko google-chrome n'existe qu'en amd64.
+          platforms: linux/amd64
+          build-args: NETFLOP_URL_ALLOWLIST=${{ matrix.allowlist }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=browser${{ matrix.suffix }}
+          cache-to: type=gha,mode=max,scope=browser${{ matrix.suffix }}
