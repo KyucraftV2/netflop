@@ -118,4 +118,22 @@ describe("checkBrowserAccess", () => {
     invalidateBrowserAuthCache("tok-alice");
     expect((await checkBrowserAccess({ uri: "/b/alice/", cookie: COOKIE }, dyn)).status).toBe(401);
   });
+
+  it("invité : 200 avec une invitation active, sinon 403 ; vérification en cache 30 s", async () => {
+    const guest = vi.fn(async (g: string, host: string) => g === "alice" && host === "bob");
+    const now = 2_000_000;
+    expect(
+      await checkBrowserAccess({ uri: "/b/bob/", cookie: COOKIE, now }, lookup, guest),
+    ).toEqual({ status: 200, slug: "alice", guestOf: "bob" });
+    expect(
+      (await checkBrowserAccess({ uri: "/b/carol/", cookie: COOKIE, now }, lookup, guest)).status,
+    ).toBe(403);
+    await checkBrowserAccess({ uri: "/b/bob/x", cookie: COOKIE, now: now + 5_000 }, lookup, guest);
+    expect(guest).toHaveBeenCalledTimes(2);
+    // Le chemin ambigu reste refusé même pour un invité.
+    expect(
+      (await checkBrowserAccess({ uri: "/b/bob/../carol/", cookie: COOKIE, now }, lookup, guest))
+        .status,
+    ).toBe(403);
+  });
 });

@@ -107,6 +107,23 @@ test("recherche, filtre « mes abonnements » puis lancement de lecture simulé"
   const sound = page.getByRole("button", { name: "Appuie pour activer le son" });
   if (await sound.isVisible()) await sound.click();
 
+  // Regarder ensemble : lien d'invitation (API simulée)
+  await page.route("**/api/browser/invite", (r) =>
+    r.request().method() === "POST"
+      ? r.fulfill({
+          status: 201,
+          json: { id: "00000000-0000-4000-8000-000000000001", path: "/ensemble/lien-de-test" },
+        })
+      : r.fulfill({ json: { invites: [] } }),
+  );
+  await page.mouse.move(10, 10);
+  await page.getByRole("button", { name: "Regarder ensemble" }).click();
+  await page.getByRole("button", { name: "Créer un lien d'invitation" }).click();
+  await expect(page.getByRole("textbox", { name: "Lien d'invitation" })).toHaveValue(
+    /\/ensemble\/lien-de-test$/,
+  );
+  await page.getByRole("button", { name: "Fermer" }).click();
+
   // Minuteur de sommeil
   await page.mouse.move(10, 10);
   await page.getByRole("button", { name: "Minuteur de sommeil" }).click();
@@ -173,6 +190,20 @@ test("notifications : section du profil, endpoint de push contrôlé", async ({ 
     return res.status;
   });
   expect(status).toBe(400);
+});
+
+test("regarder ensemble : sans session, retour au lien après connexion", async ({ page }) => {
+  await page.goto("/ensemble/abcdefghijklmnopqrstuvwxyz012345");
+  await expect(page).toHaveURL(/\/login\?next=%2Fensemble%2Fabcdefghijklmnopqrstuvwxyz012345$/);
+  await expect(page.locator('input[name="next"]')).toHaveValue(
+    "/ensemble/abcdefghijklmnopqrstuvwxyz012345",
+  );
+});
+
+test("regarder ensemble : lien invalide", async ({ page }) => {
+  await login(page);
+  await page.goto(`/ensemble/${"x".repeat(32)}`);
+  await expect(page.getByText("Cette invitation n'est plus valable.")).toBeVisible();
 });
 
 test("pages protégées : historique, profil, admin, 404", async ({ page }) => {

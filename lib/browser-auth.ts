@@ -16,7 +16,7 @@ export interface SessionLookup {
 }
 
 export type BrowserAuthResult =
-  | { status: 200; slug: string }
+  | { status: 200; slug: string; guestOf?: string }
   | { status: 401; reason: string; requested: string | null }
   | { status: 403; reason: string; requested: string | null; slug: string };
 
@@ -73,15 +73,25 @@ const tokenKey = (token: string) => createHash("sha256").update(token).digest("h
 
 type CacheEntry = { slug: string | null; until: number };
 const cache = new Map<string, CacheEntry>();
+/** Accès invité (« Regarder ensemble ») : clé = empreinte du jeton + navigateur demandé. */
+const guestCache = new Map<string, { allowed: boolean; until: number }>();
 
 export function invalidateBrowserAuthCache(token?: string): void {
-  if (token === undefined) cache.clear();
-  else cache.delete(tokenKey(token));
+  if (token === undefined) {
+    cache.clear();
+    guestCache.clear();
+  } else {
+    const key = tokenKey(token);
+    cache.delete(key);
+    for (const k of guestCache.keys()) if (k.startsWith(`${key}:`)) guestCache.delete(k);
+  }
 }
 
 export async function checkBrowserAccess(
   input: { uri: string | null; cookie: string | null; now?: number },
   lookup: (sessionToken: string) => Promise<SessionLookup | null>,
+  /** <guestSlug> a-t-il une invitation active dans le navigateur de <hostSlug> ? */
+  guestAccess?: (guestSlug: string, hostSlug: string) => Promise<boolean>,
 ): Promise<BrowserAuthResult> {
   const now = input.now ?? Date.now();
   const requested = slugFromForwardedUri(input.uri);
@@ -104,6 +114,18 @@ export async function checkBrowserAccess(
   }
 
   if (!entry.slug) return { status: 401, reason: "session invalide", requested };
+  if (requested && requested !== entry.slug && guestAccess) {
+    const gKey = `${key}:${requested}`;
+    let g = guestCache.get(gKey);
+    if (!g || g.until <= now) {
+      g = { allowed: await guestAccess(entry.slug, requested), until: now + CACHE_TTL_MS };
+      guestCache.set(gKey, g);
+      if (guestCache.size > 5000) {
+        for (const [k, e] of guestCache) if (e.until <= now) guestCache.delete(k);
+      }
+    }
+    if (g.allowed) return { status: 200, slug: entry.slug, guestOf: requested };
+  }
   if (!requested || requested !== entry.slug) {
     return {
       status: 403,
