@@ -315,3 +315,25 @@ export const watchlist = pgTable(
 );
 
 export type WatchlistEntry = typeof watchlist.$inferSelect;
+
+/* ------------------------------------------------------------------ */
+/* Journal des séances (tableau de bord admin)                         */
+/* ------------------------------------------------------------------ */
+
+/** Une ligne par séance terminée (purgée après 90 jours). */
+export const browserEvents = pgTable(
+  "browser_event",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    slug: text("slug").notNull(),
+    platform: platformEnum("platform").notNull(),
+    startedAt: timestamp("started_at", { mode: "date", withTimezone: true }).notNull(),
+    stoppedAt: timestamp("stopped_at", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+    durationSeconds: integer("duration_seconds").notNull(),
+    reason: text("reason").notNull(),
+  },
+  (t) => [index("browser_event_stopped_idx").on(t.stoppedAt)],
+);
+
+export type BrowserEvent = typeof browserEvents.$inferSelect;

@@ -3,10 +3,21 @@ import { forbidden } from "next/navigation";
 import { Suspense } from "react";
 import { PlatformBadge } from "@/components/platform-badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { listActiveBrowsersForAdmin, listQueueForAdmin, listUsersForAdmin } from "@/lib/admin";
+import {
+  listActiveBrowsersForAdmin,
+  listQueueForAdmin,
+  listUsersForAdmin,
+  recentSessions,
+  usageByDay,
+  usageByPlatform,
+  usageByUser,
+} from "@/lib/admin";
+import { isPlatformId } from "@/lib/platforms";
 import { requirePageUser } from "@/lib/auth-guard";
 import { formatBytes, formatDateTime, formatDuration } from "@/lib/utils";
+import { AutoRefresh, ClearQueueButton, ResetProfileButton } from "./admin-controls";
 import { StopBrowserButton } from "./stop-button";
+import { DailyUsageChart, ShareTable } from "./usage-charts";
 
 export const metadata: Metadata = { title: "Administration" };
 export const dynamic = "force-dynamic";
@@ -17,7 +28,10 @@ export default async function AdminPage() {
 
   return (
     <main className="mx-auto max-w-[1200px] px-4 pt-24 md:px-8">
-      <h1 className="text-3xl font-bold">Administration</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-3xl font-bold">Administration</h1>
+        <AutoRefresh />
+      </div>
 
       <section aria-labelledby="actifs" className="mt-10">
         <h2 id="actifs" className="text-xl font-semibold">
@@ -29,11 +43,46 @@ export default async function AdminPage() {
       </section>
 
       <section aria-labelledby="file" className="mt-12">
-        <h2 id="file" className="text-xl font-semibold">
-          File d&apos;attente
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h2 id="file" className="text-xl font-semibold">
+            File d&apos;attente
+          </h2>
+          <ClearQueueButton />
+        </div>
         <Suspense fallback={<Skeleton className="mt-4 h-16" />}>
           <Queue />
+        </Suspense>
+      </section>
+
+      <section aria-labelledby="visionnage" className="mt-12">
+        <h2 id="visionnage" className="text-xl font-semibold">
+          Visionnage (14 derniers jours)
+        </h2>
+        <Suspense fallback={<Skeleton className="mt-4 h-56" />}>
+          <DailyUsage />
+        </Suspense>
+        <div className="mt-6 grid gap-6 md:grid-cols-2">
+          <div className="rounded-tile bg-surface p-4">
+            <h3 className="font-semibold">Par plateforme (30 jours)</h3>
+            <Suspense fallback={<Skeleton className="mt-4 h-24" />}>
+              <PlatformUsage />
+            </Suspense>
+          </div>
+          <div className="rounded-tile bg-surface p-4">
+            <h3 className="font-semibold">Par utilisateur (30 jours)</h3>
+            <Suspense fallback={<Skeleton className="mt-4 h-24" />}>
+              <UserUsage />
+            </Suspense>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="seances" className="mt-12">
+        <h2 id="seances" className="text-xl font-semibold">
+          Dernières séances
+        </h2>
+        <Suspense fallback={<Skeleton className="mt-4 h-40" />}>
+          <RecentSessions />
         </Suspense>
       </section>
 
@@ -96,6 +145,57 @@ async function ActiveBrowsers() {
   );
 }
 
+async function DailyUsage() {
+  return <DailyUsageChart data={await usageByDay(14)} />;
+}
+
+async function PlatformUsage() {
+  return (
+    <ShareTable
+      caption="Heures de visionnage par plateforme"
+      rows={await usageByPlatform(30)}
+      renderLabel={(r) => (isPlatformId(r.key) ? <PlatformBadge id={r.key} /> : r.label)}
+    />
+  );
+}
+
+async function UserUsage() {
+  return <ShareTable caption="Heures de visionnage par utilisateur" rows={await usageByUser(30)} />;
+}
+
+async function RecentSessions() {
+  const rows = await recentSessions(30);
+  if (rows.length === 0) return <p className="mt-4 text-muted">Aucune séance terminée.</p>;
+  return (
+    <div className="mt-4 overflow-x-auto rounded-tile bg-surface">
+      <table className="w-full min-w-[640px] text-sm">
+        <thead>
+          <tr>
+            <th className={th}>Fin</th>
+            <th className={th}>Utilisateur</th>
+            <th className={th}>Plateforme</th>
+            <th className={th}>Durée</th>
+            <th className={th}>Motif d&apos;arrêt</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((e) => (
+            <tr key={e.id} className="border-t border-white/5">
+              <td className={td}>{formatDateTime(e.stoppedAt)}</td>
+              <td className={td}>{e.slug}</td>
+              <td className={td}>
+                <PlatformBadge id={e.platform} />
+              </td>
+              <td className={td}>{formatDuration(e.durationSeconds)}</td>
+              <td className={td}>{e.reason}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 async function Queue() {
   const rows = await listQueueForAdmin();
   if (rows.length === 0) return <p className="mt-4 text-muted">Personne n&apos;attend.</p>;
@@ -114,7 +214,11 @@ async function Queue() {
 }
 
 async function Users() {
-  const rows = await listUsersForAdmin();
+  const [rows, active] = await Promise.all([
+    listUsersForAdmin(),
+    listActiveBrowsersForAdmin().catch(() => []),
+  ]);
+  const running = new Set(active.map((b) => b.slug));
   return (
     <div className="mt-4 overflow-x-auto rounded-tile bg-surface">
       <table className="w-full min-w-[640px] text-sm">
@@ -125,6 +229,9 @@ async function Users() {
             <th className={th}>Rôle</th>
             <th className={th}>Dernière connexion</th>
             <th className={th}>Abonnements</th>
+            <th className={th}>
+              <span className="sr-only">Actions</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -142,6 +249,9 @@ async function Users() {
                     u.subscriptions.map((p) => <PlatformBadge key={p} id={p} />)
                   )}
                 </span>
+              </td>
+              <td className={td}>
+                <ResetProfileButton slug={u.slug} disabled={running.has(u.slug)} />
               </td>
             </tr>
           ))}

@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createLifecycle } from "@/lib/browser-lifecycle";
 import type { Db } from "@/lib/db";
-import { browserSessions, users } from "@/lib/db/schema";
+import { browserEvents, browserSessions, users } from "@/lib/db/schema";
 import { TEST_DB_URL, createUsers, fakeDocker, resetData, setupDb, testConfig } from "./helpers";
 
 describe.skipIf(!TEST_DB_URL)("cycle de vie des navigateurs (Postgres réel)", () => {
@@ -227,5 +227,28 @@ describe.skipIf(!TEST_DB_URL)("cycle de vie des navigateurs (Postgres réel)", (
     await db.update(users).set({ autoQualityHint: "saver" }).where(eq(users.id, ids.alice!));
     await lc.start(ids.alice!, { platform: "netflix" });
     expect(docker.qualities.get("alice")).toBe("saver");
+  });
+
+  it("journal : une ligne par séance terminée, même avec deux arrêts concurrents", async () => {
+    await db.delete(browserEvents);
+    await lc.start(ids.alice!, { platform: "canalplus" });
+    advance(600);
+    await Promise.all([
+      lc.stopForUser(ids.alice!, "quitter"),
+      lc.stopForUser(ids.alice!, "quitter"),
+    ]);
+    const rows = await db.select().from(browserEvents);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ slug: "alice", platform: "canalplus", reason: "quitter" });
+    expect(rows[0]!.durationSeconds).toBeGreaterThanOrEqual(600);
+  });
+
+  it("vider la file d'attente", async () => {
+    for (const u of ["alice", "bob", "carol", "dave", "eve"]) {
+      await lc.start(ids[u]!, { platform: "netflix" });
+    }
+    expect(await lc.queue()).toHaveLength(2);
+    expect(await lc.clearQueue()).toBe(2);
+    expect(await lc.queue()).toHaveLength(0);
   });
 });

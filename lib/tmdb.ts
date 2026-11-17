@@ -252,6 +252,12 @@ export async function recommendations(type: MediaType, tmdbId: number): Promise<
   });
 }
 
+/** Sonde de santé : TMDB répond-il avec la clé configurée ? (pas de cache base) */
+export async function pingTmdb(): Promise<boolean> {
+  await tmdbGet("/configuration");
+  return true;
+}
+
 /** Recherche typée (film OU série) — utilisée par l'identification du suivi (étape 5). */
 export async function searchByType(type: MediaType, query: string): Promise<TitleSummary[]> {
   const q = query.trim().slice(0, 100);

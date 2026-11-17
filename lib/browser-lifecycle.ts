@@ -4,6 +4,7 @@ import { getConfig, type ServerConfig } from "./config";
 import { getDb, type Db } from "./db";
 import {
   browserQueue,
+  browserEvents,
   browserSessions,
   users,
   type BrowserSession,
@@ -392,13 +393,38 @@ export function createLifecycle(deps: LifecycleDeps = {}) {
     } catch (err) {
       log.error("arrêt du conteneur", { user: slug, error: errorMessage(err) });
     }
-    await db().delete(browserSessions).where(eq(browserSessions.id, session.id));
-    log.info("séance terminée", {
-      user: slug,
-      slot: session.slot,
-      reason,
-      durationSeconds: Math.round((now().getTime() - session.createdAt.getTime()) / 1000),
-    });
+    const deleted = await db()
+      .delete(browserSessions)
+      .where(eq(browserSessions.id, session.id))
+      .returning({ id: browserSessions.id });
+    const durationSeconds = Math.max(
+      0,
+      Math.round((now().getTime() - session.createdAt.getTime()) / 1000),
+    );
+    // Arrêts concurrents (worker + Quitter) : seul celui qui a supprimé la ligne journalise.
+    if (deleted.length > 0) {
+      await db()
+        .insert(browserEvents)
+        .values({
+          userId: session.userId,
+          slug,
+          platform: session.platform,
+          startedAt: session.createdAt,
+          stoppedAt: now(),
+          durationSeconds,
+          reason: reason.slice(0, 200),
+        })
+        .catch((err: unknown) =>
+          log.warn("journal des séances", { user: slug, error: errorMessage(err) }),
+        );
+    }
+    log.info("séance terminée", { user: slug, slot: session.slot, reason, durationSeconds });
+  }
+
+  /** Vide la file d'attente (admin). Renvoie le nombre d'entrées retirées. */
+  async function clearQueue(): Promise<number> {
+    const removed = await db().delete(browserQueue).returning({ userId: browserQueue.userId });
+    return removed.length;
   }
 
   async function stopForUser(userId: string, reason: string): Promise<void> {
@@ -638,6 +664,7 @@ export function createLifecycle(deps: LifecycleDeps = {}) {
     leave,
     stillWatching,
     setSleep,
+    clearQueue,
     stopForUser,
     stopSession,
     serveQueue,
