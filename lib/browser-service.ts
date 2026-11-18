@@ -7,7 +7,8 @@ import {
 } from "./browser-lifecycle";
 import { navigate } from "./cdp";
 import { getDb } from "./db";
-import { browserSessions, type BrowserSession } from "./db/schema";
+import { hintToQuality, type ConnectionHint } from "./browser-spec";
+import { browserSessions, users, type BrowserSession } from "./db/schema";
 import { errorMessage, logger } from "./log";
 import { createTracker, type Tracker } from "./tracker/tracker";
 
@@ -77,6 +78,14 @@ async function retryPending(userId: string, status: BrowserStatusView): Promise<
 }
 
 /** Démarre/rejoint le navigateur et ouvre l'URL demandée (immédiatement s'il tourne déjà). */
+/** Qualité « auto » : mémorise l'estimation de connexion envoyée par l'appareil. */
+export async function rememberConnectionHint(userId: string, hint: ConnectionHint): Promise<void> {
+  await getDb()
+    .update(users)
+    .set({ autoQualityHint: hintToQuality(hint) })
+    .where(eq(users.id, userId));
+}
+
 export async function startAndOpen(userId: string, req: StartRequest): Promise<BrowserStatusView> {
   ensureBrowserHooks();
   return retryPending(userId, await lifecycle().start(userId, req));

@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createLifecycle } from "@/lib/browser-lifecycle";
 import type { Db } from "@/lib/db";
-import { browserSessions } from "@/lib/db/schema";
+import { browserSessions, users } from "@/lib/db/schema";
 import { TEST_DB_URL, createUsers, fakeDocker, resetData, setupDb, testConfig } from "./helpers";
 
 describe.skipIf(!TEST_DB_URL)("cycle de vie des navigateurs (Postgres réel)", () => {
@@ -184,5 +184,48 @@ describe.skipIf(!TEST_DB_URL)("cycle de vie des navigateurs (Postgres réel)", (
     await expect(lc.start(ids.alice!, { platform: "netflix" })).rejects.toThrow("boom");
     expect(await lc.status(ids.alice!)).toEqual({ state: "off" });
     expect(docker.containers.size).toBe(0);
+  });
+
+  it("minuteur de sommeil : arrêt à l'heure prévue, annulable", async () => {
+    await lc.start(ids.alice!, { platform: "netflix" });
+    await lc.setSleep(ids.alice!, { kind: "minutes", minutes: 30 });
+    const s = await lc.status(ids.alice!);
+    expect(s.state === "ready" && s.sleep.at).toBeTruthy();
+
+    advance(29 * 60);
+    await lc.heartbeat(ids.alice!);
+    await lc.tick();
+    expect((await lc.status(ids.alice!)).state).toBe("ready");
+
+    await lc.setSleep(ids.alice!, { kind: "off" });
+    advance(5 * 60);
+    await lc.heartbeat(ids.alice!);
+    await lc.tick();
+    expect((await lc.status(ids.alice!)).state).toBe("ready");
+
+    await lc.setSleep(ids.alice!, { kind: "minutes", minutes: 15 });
+    advance(15 * 60 + 1);
+    await lc.heartbeat(ids.alice!);
+    await lc.tick();
+    expect((await lc.status(ids.alice!)).state).toBe("off");
+    expect(docker.containers.has("alice")).toBe(false);
+  });
+
+  it("minuteur « fin de l'épisode » : drapeau exposé dans le statut", async () => {
+    await lc.start(ids.alice!, { platform: "netflix" });
+    await lc.setSleep(ids.alice!, { kind: "episode" });
+    const s = await lc.status(ids.alice!);
+    expect(s.state === "ready" && s.sleep).toEqual({ at: null, afterEpisode: true });
+  });
+
+  it("qualité « auto » : suit la dernière estimation de connexion", async () => {
+    await db.update(users).set({ videoQuality: "auto" }).where(eq(users.id, ids.alice!));
+    await lc.start(ids.alice!, { platform: "netflix" });
+    expect(docker.qualities.get("alice")).toBe("normal");
+    await lc.stopForUser(ids.alice!, "test");
+
+    await db.update(users).set({ autoQualityHint: "saver" }).where(eq(users.id, ids.alice!));
+    await lc.start(ids.alice!, { platform: "netflix" });
+    expect(docker.qualities.get("alice")).toBe("saver");
   });
 });

@@ -109,3 +109,9 @@ export function shouldStopForPause(
   const limit = minutes * 60_000;
   return now - state.pausedSince >= limit && now - state.lastProgressAt >= limit;
 }
+
+/** Délai d'arrêt sur pause : choix de l'utilisateur, plafonné par la valeur de l'admin. */
+export function effectivePauseMinutes(userMinutes: number | null | undefined, max: number): number {
+  if (userMinutes === null || userMinutes === undefined || userMinutes <= 0) return max;
+  return Math.min(userMinutes, max);
+}

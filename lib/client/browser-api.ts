@@ -1,5 +1,6 @@
 import type { BrowserStatusView } from "@/lib/browser-lifecycle";
 import type { PlatformId } from "@/lib/platforms";
+import { connectionHint } from "./connection";
 
 export type { BrowserStatusView };
 
@@ -21,7 +22,10 @@ async function post<T>(url: string, body?: unknown): Promise<T> {
 }
 
 export const browserApi = {
-  start: (platform: PlatformId) => post<BrowserStatusView>("/api/browser/start", { platform }),
+  start: (platform: PlatformId) =>
+    post<BrowserStatusView>("/api/browser/start", { platform, connection: connectionHint() }),
+  sleep: (body: { mode: "off" | "episode" } | { minutes: number }) =>
+    post<void>("/api/browser/sleep", body),
   heartbeat: () => post<BrowserStatusView>("/api/browser/heartbeat"),
   stillWatching: () => post<void>("/api/browser/still-watching"),
   quit: () => post<void>("/api/browser/quit"),

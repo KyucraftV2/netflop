@@ -75,6 +75,21 @@ export function slotPort(slot: number, cfg: ServerConfig): number {
 }
 
 export type VideoQuality = "normal" | "saver";
+export type QualityPreference = VideoQuality | "auto";
+
+/** Qualité effective : « auto » suit la dernière estimation de connexion de l'appareil. */
+export function resolveQuality(
+  pref: QualityPreference,
+  hint: VideoQuality | "auto" | null,
+): VideoQuality {
+  if (pref !== "auto") return pref;
+  return hint === "saver" ? "saver" : "normal";
+}
+
+/** Estimation côté client (Network Information API) envoyée au démarrage. */
+export type ConnectionHint = "fast" | "slow";
+export const hintToQuality = (h: ConnectionHint): VideoQuality =>
+  h === "slow" ? "saver" : "normal";
 
 /**
  * Résolutions Neko (doivent exister dans le xorg.conf de Neko).

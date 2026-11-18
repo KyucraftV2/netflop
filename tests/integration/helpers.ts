@@ -50,12 +50,15 @@ export const testConfig: ServerConfig = parseConfig({
 /** Faux Docker en mémoire. */
 export function fakeDocker() {
   const containers = new Map<string, BrowserInfo>();
+  /** Qualité demandée à la création, par utilisateur. */
+  const qualities = new Map<string, string>();
   let n = 0;
   const client = {
     async inspect(user: string) {
       return containers.get(user) ?? null;
     },
-    async createBrowser(user: string, slot: number) {
+    async createBrowser(user: string, slot: number, quality?: string) {
+      if (quality) qualities.set(user, quality);
       const info: BrowserInfo = {
         id: `c${++n}`,
         user,
@@ -91,5 +94,5 @@ export function fakeDocker() {
       return true;
     },
   } satisfies DockerClient;
-  return { client, containers };
+  return { client, containers, qualities };
 }

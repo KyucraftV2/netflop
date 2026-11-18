@@ -1,5 +1,5 @@
 import { and, asc, count, eq, isNotNull, isNull, lt, lte, or } from "drizzle-orm";
-import { healthUrl } from "./browser-spec";
+import { healthUrl, resolveQuality } from "./browser-spec";
 import { getConfig, type ServerConfig } from "./config";
 import { getDb, type Db } from "./db";
 import {
@@ -35,12 +35,17 @@ export type BrowserStatusView =
       slug: string;
       platform: PlatformId;
       stillWatchingPrompt: boolean;
+      /** Minuteur de sommeil actif. */
+      sleep: { at: string | null; afterEpisode: boolean };
       opened: OpenedContent | null;
       pendingUrl: string | null;
       error: string | null;
       /** Mot de passe Neko de la séance : renvoyé uniquement à son propriétaire. */
       nekoPassword: string;
     };
+
+export type SleepMode =
+  { kind: "off" } | { kind: "episode" } | { kind: "minutes"; minutes: number };
 
 export interface StartRequest {
   platform: PlatformId;
@@ -92,7 +97,11 @@ export function createLifecycle(deps: LifecycleDeps = {}) {
 
   async function userInfo(userId: string) {
     const [u] = await db()
-      .select({ slug: users.slug, videoQuality: users.videoQuality })
+      .select({
+        slug: users.slug,
+        videoQuality: users.videoQuality,
+        autoQualityHint: users.autoQualityHint,
+      })
       .from(users)
       .where(eq(users.id, userId));
     return u ?? null;
@@ -170,10 +179,15 @@ export function createLifecycle(deps: LifecycleDeps = {}) {
     try {
       // Un conteneur résiduel (crash, réconciliation pas encore passée) gênerait la création.
       if (await d.inspect(u.slug)) await d.removeBrowser(u.slug);
-      const info = await d.createBrowser(u.slug, session.slot, u.videoQuality, {
-        adminPassword: nekoAdminPassword(session.id),
-        userPassword: nekoUserPassword(session.id),
-      });
+      const info = await d.createBrowser(
+        u.slug,
+        session.slot,
+        resolveQuality(u.videoQuality, u.autoQualityHint),
+        {
+          adminPassword: nekoAdminPassword(session.id),
+          userPassword: nekoUserPassword(session.id),
+        },
+      );
       await d.startBrowser(u.slug);
       await db()
         .update(browserSessions)
@@ -296,6 +310,7 @@ export function createLifecycle(deps: LifecycleDeps = {}) {
         slug: row.slug,
         platform: s.platform,
         stillWatchingPrompt: s.stillWatchingPromptAt !== null,
+        sleep: { at: s.sleepAt?.toISOString() ?? null, afterEpisode: s.sleepAfterEpisode },
         opened: s.openedContent ?? null,
         pendingUrl: s.pendingUrl,
         error: s.lastError,
@@ -342,6 +357,18 @@ export function createLifecycle(deps: LifecycleDeps = {}) {
     await db()
       .update(browserSessions)
       .set({ lastInteractionAt: now(), stillWatchingPromptAt: null })
+      .where(eq(browserSessions.userId, userId));
+  }
+
+  /** Minuteur de sommeil : arrêt à une heure donnée, à la fin de l'épisode, ou annulation. */
+  async function setSleep(userId: string, mode: SleepMode): Promise<void> {
+    await db()
+      .update(browserSessions)
+      .set(
+        mode.kind === "minutes"
+          ? { sleepAt: new Date(now().getTime() + mode.minutes * 60_000), sleepAfterEpisode: false }
+          : { sleepAt: null, sleepAfterEpisode: mode.kind === "episode" },
+      )
       .where(eq(browserSessions.userId, userId));
   }
 
@@ -454,6 +481,7 @@ export function createLifecycle(deps: LifecycleDeps = {}) {
           lte(browserSessions.stopRequestedAt, ago(c.LEAVE_GRACE_SECONDS)),
           lt(browserSessions.lastHeartbeatAt, ago(c.HEARTBEAT_TIMEOUT_SECONDS)),
           lte(browserSessions.stillWatchingPromptAt, ago(c.STILL_WATCHING_GRACE_MINUTES * 60)),
+          lte(browserSessions.sleepAt, t),
           and(
             eq(browserSessions.status, "starting"),
             lt(browserSessions.createdAt, ago(c.BROWSER_START_TIMEOUT_SECONDS)),
@@ -470,9 +498,11 @@ export function createLifecycle(deps: LifecycleDeps = {}) {
             ? "pas de réponse à « Tu regardes toujours ? »"
             : session.lastHeartbeatAt < ago(c.HEARTBEAT_TIMEOUT_SECONDS)
               ? "heartbeat perdu"
-              : session.status === "starting"
-                ? "démarrage trop long"
-                : "arrêt inachevé";
+              : session.sleepAt && session.sleepAt <= t
+                ? "minuteur de sommeil"
+                : session.status === "starting"
+                  ? "démarrage trop long"
+                  : "arrêt inachevé";
       await stopSession(session, slug, reason).catch((err: unknown) =>
         log.error("arrêt", { user: slug, error: errorMessage(err) }),
       );
@@ -540,7 +570,12 @@ export function createLifecycle(deps: LifecycleDeps = {}) {
   /** Sessions actives (worker : suivi, admin). */
   async function activeSessions() {
     return db()
-      .select({ session: browserSessions, slug: users.slug, displayName: users.displayName })
+      .select({
+        session: browserSessions,
+        slug: users.slug,
+        displayName: users.displayName,
+        pausedStopMinutes: users.pausedStopMinutes,
+      })
       .from(browserSessions)
       .innerJoin(users, eq(users.id, browserSessions.userId))
       .orderBy(asc(browserSessions.slot));
@@ -602,6 +637,7 @@ export function createLifecycle(deps: LifecycleDeps = {}) {
     heartbeat,
     leave,
     stillWatching,
+    setSleep,
     stopForUser,
     stopSession,
     serveQueue,

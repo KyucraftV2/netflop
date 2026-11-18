@@ -56,6 +56,7 @@ test("recherche, filtre « mes abonnements » puis lancement de lecture simulé"
     slug: "alice",
     platform: "canalplus",
     stillWatchingPrompt: false,
+    sleep: { at: null as string | null, afterEpisode: false },
     opened: {
       platform: "canalplus",
       url: "https://www.canalplus.com/",
@@ -74,6 +75,13 @@ test("recherche, filtre « mes abonnements » puis lancement de lecture simulé"
   await page.route("**/api/browser/still-watching", (r) => r.fulfill({ status: 204 }));
   await page.route("**/api/browser/leave", (r) => r.fulfill({ status: 204 }));
   await page.route("**/api/browser/quit", (r) => r.fulfill({ status: 204 }));
+  let sleepBody: unknown = null;
+  await page.route("**/api/browser/sleep", (r) => {
+    sleepBody = r.request().postDataJSON();
+    // Le serveur renvoie ensuite le minuteur dans le statut.
+    ready.sleep = { at: new Date(Date.now() + 30 * 60_000).toISOString(), afterEpisode: false };
+    return r.fulfill({ status: 204 });
+  });
   await page.route("**/b/alice/**", (r) =>
     r.fulfill({
       contentType: "text/html",
@@ -98,6 +106,14 @@ test("recherche, filtre « mes abonnements » puis lancement de lecture simulé"
   if (await keepPortrait.isVisible()) await keepPortrait.click();
   const sound = page.getByRole("button", { name: "Appuie pour activer le son" });
   if (await sound.isVisible()) await sound.click();
+
+  // Minuteur de sommeil
+  await page.mouse.move(10, 10);
+  await page.getByRole("button", { name: "Minuteur de sommeil" }).click();
+  await page.getByRole("menuitem", { name: "Dans 30 min" }).click();
+  await page.mouse.move(20, 20);
+  await expect(page.getByRole("button", { name: /^Arrêt dans (29|30|31) min$/ })).toBeVisible();
+  expect(sleepBody).toEqual({ minutes: 30 });
 
   await page.mouse.move(10, 10);
   await page.getByRole("button", { name: "Quitter" }).click();

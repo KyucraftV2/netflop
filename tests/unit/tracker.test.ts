@@ -223,3 +223,21 @@ describe("choix de l'observation", () => {
     expect(obs?.probe.title).toBe("Série - france.tv");
   });
 });
+
+describe("préférences de lecture", () => {
+  it("délai de pause : choix de l'utilisateur plafonné par l'admin", async () => {
+    const { effectivePauseMinutes } = await import("@/lib/tracker/progress");
+    expect(effectivePauseMinutes(null, 30)).toBe(30);
+    expect(effectivePauseMinutes(10, 30)).toBe(10);
+    expect(effectivePauseMinutes(120, 30)).toBe(30);
+    expect(effectivePauseMinutes(0, 30)).toBe(30);
+  });
+
+  it("qualité « auto »", async () => {
+    const { resolveQuality } = await import("@/lib/browser-spec");
+    expect(resolveQuality("normal", "saver")).toBe("normal");
+    expect(resolveQuality("saver", null)).toBe("saver");
+    expect(resolveQuality("auto", null)).toBe("normal");
+    expect(resolveQuality("auto", "saver")).toBe("saver");
+  });
+});

@@ -12,6 +12,7 @@ import { accounts, userSubscriptions, users } from "@/lib/db/schema";
 import { removeProfileVolume } from "@/lib/docker";
 import { errorMessage, logger } from "@/lib/log";
 import { PLATFORM_IDS } from "@/lib/platforms";
+import { PAUSE_CHOICES } from "@/lib/sleep";
 
 const log = logger("profile");
 
@@ -52,7 +53,7 @@ export async function completeOnboarding(input: { platforms: string[] }): Promis
   redirect("/");
 }
 
-const qualitySchema = z.object({ quality: z.enum(["normal", "saver"]) });
+const qualitySchema = z.object({ quality: z.enum(["normal", "saver", "auto"]) });
 
 export async function saveVideoQuality(input: { quality: string }): Promise<ActionResult> {
   const user = await requireUser();
@@ -64,6 +65,27 @@ export async function saveVideoQuality(input: { quality: string }): Promise<Acti
     .where(eq(users.id, user.id));
   revalidatePath("/profil");
   return { ok: true, message: "Appliqué au prochain démarrage du navigateur" };
+}
+
+const pauseSchema = z.object({
+  minutes: z
+    .number()
+    .int()
+    .refine((m) => (PAUSE_CHOICES as readonly number[]).includes(m))
+    .nullable(),
+});
+
+/** Délai d'arrêt sur pause (NULL = valeur de l'admin, qui reste le plafond). */
+export async function savePausedStop(input: { minutes: number | null }): Promise<ActionResult> {
+  const user = await requireUser();
+  const parsed = pauseSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Délai invalide" };
+  await getDb()
+    .update(users)
+    .set({ pausedStopMinutes: parsed.data.minutes })
+    .where(eq(users.id, user.id));
+  revalidatePath("/profil");
+  return { ok: true, message: "Enregistré" };
 }
 
 /** Supprime le volume netflop-profile-<slug> (navigateur éteint uniquement). */
