@@ -7,7 +7,16 @@
  * sans prévenir ; leur échec ne doit jamais faire planter le hub (on passe au suivant).
  */
 
-export const PLATFORM_IDS = ["netflix", "canalplus", "francetv"] as const;
+export const PLATFORM_IDS = [
+  "netflix",
+  "canalplus",
+  "francetv",
+  "primevideo",
+  "disneyplus",
+  "arte",
+  "tf1plus",
+  "m6plus",
+] as const;
 export type PlatformId = (typeof PLATFORM_IDS)[number];
 
 export interface DomSelectors {
@@ -114,6 +123,124 @@ export const PLATFORMS: Record<PlatformId, Platform> = {
     },
     documentTitleSuffixes: [/\s*[-|–]\s*france\.tv\s*$/i, /\s*[-|–]\s*france\.tv.*$/i],
   },
+  // Plateformes ajoutées sans validation en conditions réelles : URL de lecture, sélecteurs
+  // et domaines « fragiles » à confirmer (voir CONTRIBUTING.md).
+  primevideo: {
+    id: "primevideo",
+    name: "Prime Video",
+    homeUrl: "https://www.primevideo.com/",
+    searchUrlTemplate: "https://www.primevideo.com/search/?phrase={q}",
+    color: "#0f79af",
+    textColor: "#ffffff",
+    logo: "/platforms/primevideo.svg",
+    tileColor: "#0a1a24",
+    tmdbProviderNamePatterns: [/^amazon prime video\b/, /^prime video\b/],
+    allowedDomains: [
+      "primevideo.com",
+      "amazon.fr",
+      "amazon.com",
+      "media-amazon.com",
+      "ssl-images-amazon.com",
+      "amazonvideo.com",
+      "aiv-cdn.net",
+      "aiv-delivery.net",
+      "pv-cdn.net",
+    ],
+    // Lecteur superposé à la page du titre (pas d'URL dédiée) : le tracker se fie à la
+    // durée de la vidéo (≥ 3 min) pour écarter les bandes-annonces.
+    playbackUrlPatterns: [/^https:\/\/www\.primevideo\.com\/.*(?:\/detail\/|\/watch\/)/],
+    domSelectors: {
+      title: [".atvwebplayersdk-title-text"],
+      episode: [".atvwebplayersdk-subtitle-text"],
+    },
+    documentTitleSuffixes: [/\s*[-|–]\s*Prime Video\s*$/i, /^Prime Video\s*:\s*/i],
+  },
+  disneyplus: {
+    id: "disneyplus",
+    name: "Disney+",
+    homeUrl: "https://www.disneyplus.com/fr-fr/home",
+    searchUrlTemplate: "https://www.disneyplus.com/fr-fr/search?q={q}",
+    color: "#0b3a8c",
+    textColor: "#ffffff",
+    logo: "/platforms/disneyplus.svg",
+    tileColor: "#0a1433",
+    tmdbProviderNamePatterns: [/^disney\s*(\+|plus)$/],
+    allowedDomains: [
+      "disneyplus.com",
+      "disney-plus.net",
+      "bamgrid.com",
+      "dssott.com",
+      "disneystreaming.com",
+    ],
+    playbackUrlPatterns: [
+      /^https:\/\/www\.disneyplus\.com\/(?:[a-z]{2}-[a-z]{2}\/)?(?:video|play)\//,
+    ],
+    domSelectors: {
+      title: [".title-field", '[data-testid="title-field"]'],
+      episode: [".subtitle-field", '[data-testid="subtitle-field"]'],
+    },
+    documentTitleSuffixes: [/\s*[-|–]\s*Disney\+\s*$/i, /^Regarder\s+/i],
+  },
+  arte: {
+    id: "arte",
+    name: "ARTE",
+    tagline: "gratuit",
+    homeUrl: "https://www.arte.tv/fr/",
+    searchUrlTemplate: "https://www.arte.tv/fr/search/?q={q}",
+    color: "#c4401b",
+    textColor: "#ffffff",
+    logo: "/platforms/arte.svg",
+    tileColor: "#1f0f0a",
+    tmdbProviderNamePatterns: [/^arte\b/],
+    allowedDomains: ["arte.tv", "arte.fr"],
+    playbackUrlPatterns: [/^https:\/\/www\.arte\.tv\/[a-z]{2}\/videos\/\d{6}-\d{3}-[A-Z]\//],
+    domSelectors: {
+      title: ["h1"],
+      episode: ['[data-testid="ts-subtitle"]', "h2"],
+    },
+    documentTitleSuffixes: [
+      /\s*[-|–]\s*Regarder le (?:film|documentaire|programme) complet.*$/i,
+      /\s*[|–-]\s*ARTE.*$/i,
+    ],
+  },
+  tf1plus: {
+    id: "tf1plus",
+    name: "TF1+",
+    tagline: "gratuit",
+    homeUrl: "https://www.tf1.fr/",
+    searchUrlTemplate: "https://www.tf1.fr/recherche?q={q}",
+    color: "#1e3fa0",
+    textColor: "#ffffff",
+    logo: "/platforms/tf1plus.svg",
+    tileColor: "#0b1533",
+    tmdbProviderNamePatterns: [/^tf1\s*\+/, /^tf1$/],
+    allowedDomains: ["tf1.fr", "tf1info.fr", "tf1.tv"],
+    playbackUrlPatterns: [/^https:\/\/www\.tf1\.fr\/.+\/videos\/[^/]+/],
+    domSelectors: {
+      title: ['[data-testid="player-title"]', "h1"],
+      episode: ['[data-testid="player-subtitle"]', "h2"],
+    },
+    documentTitleSuffixes: [/\s*[-|–]\s*TF1\+?.*$/i],
+  },
+  m6plus: {
+    id: "m6plus",
+    name: "M6+",
+    tagline: "gratuit",
+    homeUrl: "https://www.m6.fr/",
+    searchUrlTemplate: "https://www.m6.fr/recherche?q={q}",
+    color: "#2a2a2a",
+    textColor: "#ffffff",
+    logo: "/platforms/m6plus.svg",
+    tileColor: "#151515",
+    tmdbProviderNamePatterns: [/^m6\s*\+/, /^6play\b/],
+    allowedDomains: ["m6.fr", "6play.fr", "m6web.fr", "m6tvcdn.net"],
+    playbackUrlPatterns: [/^https:\/\/www\.m6\.fr\/.+\/(?:videos?|player)\//],
+    domSelectors: {
+      title: ['[data-testid="player-title"]', "h1"],
+      episode: ['[data-testid="player-subtitle"]', "h2"],
+    },
+    documentTitleSuffixes: [/\s*[-|–]\s*M6\+?.*$/i],
+  },
 };
 
 export const PLATFORM_LIST: Platform[] = PLATFORM_IDS.map((id) => PLATFORMS[id]);
@@ -182,4 +309,27 @@ export function platformForUrl(href: string): PlatformId | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Plateformes activées sur cette instance (côté serveur) : variable NETFLOP_PLATFORMS,
+ * liste d'identifiants séparés par des virgules. Vide = toutes. Les identifiants
+ * inconnus sont ignorés ; si aucun n'est valide, toutes restent actives.
+ */
+export function enabledPlatformIds(raw = process.env.NETFLOP_PLATFORMS): PlatformId[] {
+  const wanted = (raw ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(isPlatformId);
+  if (wanted.length === 0) return [...PLATFORM_IDS];
+  // Ordre de PLATFORM_IDS, sans doublon.
+  return PLATFORM_IDS.filter((id) => wanted.includes(id));
+}
+
+export function enabledPlatforms(raw?: string): Platform[] {
+  return enabledPlatformIds(raw).map((id) => PLATFORMS[id]);
+}
+
+export function isPlatformEnabled(id: PlatformId, raw?: string): boolean {
+  return enabledPlatformIds(raw).includes(id);
 }

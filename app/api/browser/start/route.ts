@@ -2,13 +2,13 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth-guard";
 import { rememberConnectionHint, startAndOpen } from "@/lib/browser-service";
 import { parseJson, route } from "@/lib/http";
-import { PLATFORM_IDS, PLATFORMS } from "@/lib/platforms";
+import { isPlatformEnabled, PLATFORM_IDS, PLATFORMS } from "@/lib/platforms";
 
 export const dynamic = "force-dynamic";
 
 const bodySchema = z
   .object({
-    platform: z.enum(PLATFORM_IDS),
+    platform: z.enum(PLATFORM_IDS).refine((p) => isPlatformEnabled(p), "plateforme désactivée"),
     /** Estimation de la connexion (qualité « auto »). */
     connection: z.enum(["fast", "slow"]).optional(),
   })

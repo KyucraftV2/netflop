@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Logo } from "@/components/logo";
 import { requirePageUser } from "@/lib/auth-guard";
+import { enabledPlatformIds } from "@/lib/platforms";
 import { OnboardingForm } from "./onboarding-form";
 
 export const metadata: Metadata = { title: "Bienvenue" };
@@ -17,7 +18,7 @@ export default async function WelcomePage() {
         Choisis les plateformes auxquelles tu es abonné : on n&apos;affichera que ce que tu peux
         regarder.
       </p>
-      <OnboardingForm />
+      <OnboardingForm available={enabledPlatformIds()} />
       <div className="mt-8 rounded-tile bg-surface p-5 text-sm leading-relaxed">
         <strong className="text-white">Bon à savoir :</strong> à ta première séance, connecte-toi
         une fois à chaque plateforme dans ton navigateur Netflop, ça restera enregistré.

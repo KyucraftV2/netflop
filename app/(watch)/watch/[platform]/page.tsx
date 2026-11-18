@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { WatchClient } from "@/components/watch/watch-client";
 import { requirePageUser } from "@/lib/auth-guard";
-import { isPlatformId, PLATFORMS } from "@/lib/platforms";
+import { isPlatformEnabled, isPlatformId, PLATFORMS } from "@/lib/platforms";
 
 type Params = { platform: string };
 
@@ -20,7 +20,7 @@ export default async function WatchPage({
 }) {
   const user = await requirePageUser();
   const { platform } = await params;
-  if (!isPlatformId(platform)) notFound();
+  if (!isPlatformId(platform) || !isPlatformEnabled(platform)) notFound();
   const { opened } = await searchParams;
   return (
     <WatchClient

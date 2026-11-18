@@ -10,6 +10,7 @@ import { getDb } from "@/lib/db";
 import { userSubscriptions, users } from "@/lib/db/schema";
 import { BrowserCard, PauseForm, QualityForm, SubscriptionsForm } from "./profile-forms";
 import { getConfig } from "@/lib/config";
+import { enabledPlatformIds } from "@/lib/platforms";
 
 export const metadata: Metadata = { title: "Profil" };
 
@@ -38,7 +39,7 @@ export default async function ProfilePage() {
         <p className="mt-1 text-sm text-muted">
           Utilisé par le filtre « mes abonnements » de la recherche et par l&apos;accueil.
         </p>
-        <SubscriptionsForm initial={subs.map((s) => s.platform)} />
+        <SubscriptionsForm initial={subs.map((s) => s.platform)} available={enabledPlatformIds()} />
       </section>
 
       <section aria-labelledby="navigateur" className="mt-12">

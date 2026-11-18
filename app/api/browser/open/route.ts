@@ -4,7 +4,7 @@ import { rememberConnectionHint, startAndOpen } from "@/lib/browser-service";
 import { parseJson, route } from "@/lib/http";
 import { logger } from "@/lib/log";
 import { titleUrl } from "@/lib/open-url";
-import { PLATFORM_IDS, validateNavigationUrl } from "@/lib/platforms";
+import { isPlatformEnabled, PLATFORM_IDS, validateNavigationUrl } from "@/lib/platforms";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ const log = logger("open");
 
 const bodySchema = z
   .object({
-    platform: z.enum(PLATFORM_IDS),
+    platform: z.enum(PLATFORM_IDS).refine((p) => isPlatformEnabled(p), "plateforme désactivée"),
     tmdbId: z.number().int().positive().max(100_000_000),
     type: z.enum(["movie", "tv"]),
     title: z.string().trim().min(1).max(200),

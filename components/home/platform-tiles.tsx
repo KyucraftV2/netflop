@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { PLATFORM_LIST, type PlatformId } from "@/lib/platforms";
+import { enabledPlatforms, type PlatformId } from "@/lib/platforms";
 import { cn } from "@/lib/utils";
 
 /** Grandes tuiles plateformes (2 colonnes mobile, 3 tablette/ordi). */
@@ -11,8 +11,9 @@ export function PlatformTiles({
   subscribed: PlatformId[];
   showAll: boolean;
 }) {
-  const visible = PLATFORM_LIST.filter((p) => showAll || subscribed.includes(p.id));
-  const hidden = PLATFORM_LIST.length - visible.length;
+  const all = enabledPlatforms();
+  const visible = all.filter((p) => showAll || subscribed.includes(p.id));
+  const hidden = all.length - visible.length;
 
   return (
     <section aria-labelledby="plateformes" className="mt-10">

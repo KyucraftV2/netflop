@@ -6,7 +6,7 @@ import { PlatformPicker } from "@/components/platform-picker";
 import { Button } from "@/components/ui/button";
 import type { PlatformId } from "@/lib/platforms";
 
-export function OnboardingForm() {
+export function OnboardingForm({ available }: { available: PlatformId[] }) {
   const [platforms, setPlatforms] = useState<PlatformId[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -23,7 +23,12 @@ export function OnboardingForm() {
         });
       }}
     >
-      <PlatformPicker value={platforms} onChange={setPlatforms} disabled={pending} />
+      <PlatformPicker
+        platforms={available}
+        value={platforms}
+        onChange={setPlatforms}
+        disabled={pending}
+      />
       {error ? (
         <p role="alert" className="mt-4 text-sm text-danger">
           {error}
