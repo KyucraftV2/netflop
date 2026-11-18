@@ -3,7 +3,7 @@
 
 FROM oven/bun:1-alpine AS bun
 
-FROM node:22-alpine AS deps
+FROM node:26-alpine AS deps
 RUN apk add --no-cache libc6-compat libstdc++ libgcc
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /app
@@ -15,7 +15,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY . .
 RUN bun run build
 
-FROM node:22-alpine AS runtime
+FROM node:26-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
