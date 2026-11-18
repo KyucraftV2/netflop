@@ -278,3 +278,32 @@ export type WatchProgress = typeof watchProgress.$inferSelect;
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+
+/* ------------------------------------------------------------------ */
+/* Ma liste                                                            */
+/* ------------------------------------------------------------------ */
+
+/** Titres mis de côté par l'utilisateur pour plus tard. */
+export const watchlist = pgTable(
+  "watchlist",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tmdbId: integer("tmdb_id").notNull(),
+    type: mediaTypeEnum("type").notNull(),
+    title: text("title").notNull(),
+    year: integer("year"),
+    posterPath: text("poster_path"),
+    /** Plateformes connues à l'ajout (rafraîchies à l'affichage via TMDB). */
+    platforms: jsonb("platforms").$type<string[]>().notNull().default([]),
+    addedAt: timestamp("added_at", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("watchlist_user_title_uq").on(t.userId, t.tmdbId, t.type),
+    index("watchlist_user_added_idx").on(t.userId, t.addedAt),
+  ],
+);
+
+export type WatchlistEntry = typeof watchlist.$inferSelect;

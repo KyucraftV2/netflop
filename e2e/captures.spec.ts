@@ -25,8 +25,16 @@ test("captures", async ({ page }) => {
   await page.goto("/?toutes=1");
   await shot(page, "accueil-toutes-plateformes");
   await page.goto("/?q=last");
-  await page.getByRole("button", { name: /The Last of Us/ }).waitFor();
+  await page.getByRole("button", { name: /^The Last of Us.*canalplus/ }).waitFor();
   await shot(page, "recherche");
+  for (const t of ["The Last of Us", "The Last Kingdom"]) {
+    const add = page.getByRole("button", { name: `Ajouter à ma liste : ${t}` });
+    if (await add.isVisible()) await add.click();
+    await page.getByRole("button", { name: `Retirer de ma liste : ${t}` }).waitFor();
+  }
+  await page.goto("/");
+  await page.getByRole("region", { name: "Ma liste" }).waitFor();
+  await shot(page, "accueil-ma-liste");
   await page.goto("/historique");
   await shot(page, "historique");
   await page.goto("/profil");

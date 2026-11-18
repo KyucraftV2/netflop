@@ -37,12 +37,12 @@ test("recherche, filtre « mes abonnements » puis lancement de lecture simulé"
   if (!(await field.isVisible())) await page.getByRole("button", { name: "Rechercher" }).click();
   await field.fill("last");
 
-  await expect(page.getByRole("button", { name: /The Last of Us.*canalplus/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /The Last Kingdom.*netflix/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Last Night in Soho/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^The Last of Us.*canalplus/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^The Last Kingdom.*netflix/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Last Night in Soho/ })).toHaveCount(0);
 
   await page.getByRole("switch", { name: "Mes abonnements uniquement" }).click();
-  await expect(page.getByRole("button", { name: /Last Night in Soho/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Last Night in Soho/ })).toBeVisible();
   await page.getByRole("switch", { name: "Mes abonnements uniquement" }).click();
 
   // Navigateur simulé : l'API Docker/Neko n'est pas sollicitée.
@@ -81,7 +81,7 @@ test("recherche, filtre « mes abonnements » puis lancement de lecture simulé"
     }),
   );
 
-  await page.getByRole("button", { name: /The Last of Us/ }).click();
+  await page.getByRole("button", { name: /^The Last of Us.*canalplus/ }).click();
   await expect(page).toHaveURL(/\/watch\/canalplus\?opened=1/);
   await expect(page.locator('iframe[title^="Navigateur Netflop"]')).toBeVisible({
     timeout: 10_000,
@@ -102,6 +102,24 @@ test("recherche, filtre « mes abonnements » puis lancement de lecture simulé"
   await page.mouse.move(10, 10);
   await page.getByRole("button", { name: "Quitter" }).click();
   await expect(page).toHaveURL(/\/$/);
+});
+
+test("Ma liste : ajout depuis la recherche, rangée sur l'accueil, retrait", async ({ page }) => {
+  await login(page);
+  await page.goto("/?q=last");
+  const add = page.getByRole("button", { name: "Ajouter à ma liste : The Last of Us" });
+  await add.click();
+  await expect(
+    page.getByRole("button", { name: "Retirer de ma liste : The Last of Us" }),
+  ).toHaveAttribute("aria-pressed", "true");
+
+  await page.goto("/");
+  const row = page.getByRole("region", { name: "Ma liste" });
+  await expect(row.getByRole("button", { name: /^The Last of Us/ })).toBeVisible();
+
+  await row.getByRole("button", { name: "Retirer de ma liste : The Last of Us" }).click();
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Ma liste" })).toHaveCount(0);
 });
 
 test("pages protégées : historique, profil, admin, 404", async ({ page }) => {

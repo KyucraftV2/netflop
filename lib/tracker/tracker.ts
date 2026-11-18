@@ -11,6 +11,7 @@ import { identify, type Candidate } from "./identify";
 import { buildProbeExpression, type ProbeResult } from "./probe";
 import { decide, shouldStopForPause, type TrackState } from "./progress";
 import { CONFIDENCE_THRESHOLD, resolveCandidate, type Resolved } from "./resolve";
+import { removeWatchedMovie } from "../watchlist";
 
 /**
  * Suivi de visionnage automatique (worker) : lit l'état du Chrome de chaque séance par
@@ -152,6 +153,10 @@ export function createTracker(lc: Lifecycle) {
           targetWhere: sql`${watchProgress.tmdbId} is null`,
           set,
         });
+    }
+    // Film terminé : il sort de « Ma liste ».
+    if (completed && values.tmdbId !== null && values.type === "movie") {
+      await removeWatchedMovie(session.userId, values.tmdbId);
     }
   }
 
