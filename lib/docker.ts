@@ -299,3 +299,4 @@ export const removeBrowser = (user: string) => client().removeBrowser(user);
 export const listBrowsers = () => client().listBrowsers();
 export const browserStats = (user: string) => client().browserStats(user);
 export const removeProfileVolume = (user: string) => client().removeProfileVolume(user);
+export const pingDocker = () => client().ping();

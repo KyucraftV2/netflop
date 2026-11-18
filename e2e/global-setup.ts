@@ -50,5 +50,27 @@ export default async function globalSetup() {
     percent: 0.36,
     confidence: 1,
   });
+  // Tableau de bord admin : 1 h de lecture aujourd'hui et une séance terminée.
+  const now = new Date();
+  await db.insert(schema.watchSamples).values(
+    Array.from({ length: 120 }, () => ({
+      userId: alice!.id,
+      platform: "netflix" as const,
+      url: "https://www.netflix.com/watch/80074249",
+      position: 1200,
+      duration: 3300,
+      paused: false,
+      capturedAt: now,
+    })),
+  );
+  await db.insert(schema.browserEvents).values({
+    userId: alice!.id,
+    slug: "alice",
+    platform: "netflix",
+    startedAt: new Date(now.getTime() - 3_600_000),
+    stoppedAt: now,
+    durationSeconds: 3600,
+    reason: "onglet fermé",
+  });
   await sql.end();
 }

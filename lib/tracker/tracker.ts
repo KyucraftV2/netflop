@@ -4,7 +4,7 @@ import { evaluateEverywhere, type FrameEvaluation } from "../cdp";
 import { getConfig } from "../config";
 import { purgeExpiredCache } from "../cache";
 import { getDb } from "../db";
-import { watchProgress, watchSamples, type BrowserSession } from "../db/schema";
+import { browserEvents, watchProgress, watchSamples, type BrowserSession } from "../db/schema";
 import { errorMessage, logger } from "../log";
 import { isPlaybackUrl, PLATFORMS, platformForUrl, type PlatformId } from "../platforms";
 import { identify, type Candidate } from "./identify";
@@ -12,6 +12,9 @@ import { buildProbeExpression, type ProbeResult } from "./probe";
 import { decide, effectivePauseMinutes, shouldStopForPause, type TrackState } from "./progress";
 import { CONFIDENCE_THRESHOLD, resolveCandidate, type Resolved } from "./resolve";
 import { removeWatchedMovie } from "../watchlist";
+
+/** Durée de conservation du journal des séances (tableau de bord admin). */
+export const EVENT_RETENTION_DAYS = 90;
 
 /**
  * Suivi de visionnage automatique (worker) : lit l'état du Chrome de chaque séance par
@@ -252,6 +255,14 @@ export function createTracker(lc: Lifecycle) {
         .where(lt(watchSamples.capturedAt, cutoff))
         .returning({ id: watchSamples.id });
       if (purged.length) log.info("échantillons purgés", { count: purged.length });
+      const eventsPurged = await getDb()
+        .delete(browserEvents)
+        .where(
+          lt(browserEvents.stoppedAt, new Date(Date.now() - EVENT_RETENTION_DAYS * 86_400_000)),
+        )
+        .returning({ id: browserEvents.id });
+      if (eventsPurged.length)
+        log.info("journal des séances purgé", { count: eventsPurged.length });
       const cachePurged = await purgeExpiredCache();
       if (cachePurged) log.info("cache API expiré purgé", { count: cachePurged });
     }

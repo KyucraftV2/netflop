@@ -149,6 +149,12 @@ test("Ma liste : ajout depuis la recherche, rangée sur l'accueil, retrait", asy
   await expect(page.getByRole("region", { name: "Ma liste" })).toHaveCount(0);
 });
 
+test("sondes d'exploitation fermées sans jeton", async ({ request }) => {
+  expect((await request.get("/api/health")).status()).toBe(200);
+  expect((await request.get("/api/health?deep=1")).status()).toBe(401);
+  expect((await request.get("/api/metrics")).status()).toBe(404);
+});
+
 test("pages protégées : historique, profil, admin, 404", async ({ page }) => {
   await login(page);
   await page.goto("/historique");
@@ -158,6 +164,13 @@ test("pages protégées : historique, profil, admin, 404", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Mes abonnements" })).toBeVisible();
   await page.goto("/admin");
   await expect(page.getByRole("heading", { name: "Administration" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Visionnage/ })).toBeVisible();
+  await expect(page.getByText("1 h au total sur 14 jours")).toBeVisible();
+  await expect(page.getByRole("cell", { name: "onglet fermé" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Vider la file" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Supprimer le profil Chrome de alice" }),
+  ).toBeVisible();
   const res = await page.goto("/nimporte-quoi");
   expect(res?.status()).toBe(404);
   await expect(page.getByText("404")).toBeVisible();
