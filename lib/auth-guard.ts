@@ -39,9 +39,9 @@ export async function requireAdmin(): Promise<SessionUser> {
   return u;
 }
 
-/** Pages : redirige vers /login si pas de session. */
-export async function requirePageUser(): Promise<SessionUser> {
+/** Pages : redirige vers /login si pas de session (avec retour à `next` après connexion). */
+export async function requirePageUser(next?: string): Promise<SessionUser> {
   const u = await currentUser();
-  if (!u) redirect("/login");
+  if (!u) redirect(next ? `/login?next=${encodeURIComponent(next)}` : "/login");
   return u;
 }

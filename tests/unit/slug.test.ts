@@ -42,3 +42,21 @@ describe("collision", () => {
     expect(s.endsWith("-12")).toBe(true);
   });
 });
+
+describe("safeNextPath (retour après connexion)", () => {
+  it.each([
+    ["/ensemble/abc", "/ensemble/abc"],
+    ["/historique?plateforme=netflix", "/historique?plateforme=netflix"],
+    ["//evil.io", "/"],
+    ["/\\evil.io", "/"],
+    ["https://evil.io", "/"],
+    ["javascript:alert(1)", "/"],
+    ["/login?next=/x", "/"],
+    ["/api/browser/quit", "/"],
+    ["/b/alice/", "/"],
+    [undefined, "/"],
+  ])("%s → %s", async (raw, expected) => {
+    const { safeNextPath } = await import("@/lib/utils");
+    expect(safeNextPath(raw)).toBe(expected);
+  });
+});

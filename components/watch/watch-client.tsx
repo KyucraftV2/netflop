@@ -10,6 +10,7 @@ import { RotateHint } from "./rotate-hint";
 import { SoundOverlay } from "./sound-overlay";
 import { StatusScreen, type ScreenKind } from "./status-screen";
 import { StillWatchingDialog } from "./still-watching-dialog";
+import { InvitePanel } from "./invite-panel";
 import type { SleepChoice } from "./sleep-menu";
 import { Toolbar } from "./toolbar";
 
@@ -32,6 +33,7 @@ export function WatchClient({
   const [status, setStatus] = useState<BrowserStatusView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [frameLoaded, setFrameLoaded] = useState(false);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -250,7 +252,10 @@ export function WatchClient({
         canUseBrowser={ready && !screen}
         sleep={active?.sleep ?? null}
         onSleep={(c) => void chooseSleep(c)}
+        onInvite={() => setInviteOpen((o) => !o)}
+        inviteOpen={inviteOpen}
       />
+      {inviteOpen && ready ? <InvitePanel onClose={() => setInviteOpen(false)} /> : null}
 
       {ready && !screen ? <SoundOverlay frameRef={frameRef} /> : null}
       {ready && !screen ? <RotateHint /> : null}

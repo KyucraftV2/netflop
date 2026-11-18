@@ -33,3 +33,14 @@ export function episodeLabel(season: number | null, episode: number | null): str
   if (!episode) return null;
   return `S${season ?? 1} · É${episode}`;
 }
+
+/**
+ * Page de retour après connexion : uniquement un chemin interne du hub (« /… »), jamais
+ * « //hôte », un schéma ou un antislash (redirection ouverte). Sinon l'accueil.
+ */
+export function safeNextPath(raw: unknown): string {
+  if (typeof raw !== "string" || raw.length > 300) return "/";
+  if (!raw.startsWith("/") || raw.startsWith("//") || /[\\\s]/.test(raw)) return "/";
+  if (raw.startsWith("/login") || raw.startsWith("/api/") || raw.startsWith("/b/")) return "/";
+  return raw;
+}

@@ -379,3 +379,34 @@ export const episodeNotifications = pgTable(
 );
 
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
+
+/* ------------------------------------------------------------------ */
+/* Regarder ensemble                                                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Invitation dans le navigateur d'un autre membre. Valable pour UNE séance de l'hôte
+ * (browser_session.id) et un seul invité (le premier membre qui l'ouvre).
+ * Seule l'empreinte SHA-256 du jeton est stockée.
+ */
+export const watchInvites = pgTable(
+  "watch_invite",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tokenHash: text("token_hash").notNull().unique(),
+    hostUserId: text("host_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sessionId: uuid("session_id").notNull(),
+    guestUserId: text("guest_user_id").references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { mode: "date", withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { mode: "date", withTimezone: true }),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("watch_invite_host_idx").on(t.hostUserId),
+    index("watch_invite_guest_idx").on(t.guestUserId),
+  ],
+);
+
+export type WatchInvite = typeof watchInvites.$inferSelect;

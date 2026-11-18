@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Keyboard, Maximize, Minimize, X } from "lucide-react";
+import { ArrowLeft, Keyboard, Maximize, Minimize, Users, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
@@ -32,6 +32,8 @@ export function Toolbar({
   canUseBrowser,
   sleep,
   onSleep,
+  onInvite,
+  inviteOpen,
 }: {
   platform: PlatformId;
   title: string | null;
@@ -42,6 +44,8 @@ export function Toolbar({
   canUseBrowser: boolean;
   sleep: SleepState | null;
   onSleep: (c: SleepChoice) => void;
+  onInvite: () => void;
+  inviteOpen: boolean;
 }) {
   const p = PLATFORMS[platform];
   const [visible, setVisible] = useState(true);
@@ -220,6 +224,17 @@ export function Toolbar({
             title="Clavier (Alt+Maj+K)"
           >
             <Keyboard />
+          </Button>
+          <Button
+            variant={inviteOpen ? "light" : "ghost"}
+            size="icon"
+            onClick={onInvite}
+            disabled={!canUseBrowser}
+            aria-label="Regarder ensemble"
+            aria-pressed={inviteOpen}
+            title="Regarder ensemble"
+          >
+            <Users />
           </Button>
           {sleep ? <SleepMenu sleep={sleep} onChoose={onSleep} disabled={!canUseBrowser} /> : null}
           <Button

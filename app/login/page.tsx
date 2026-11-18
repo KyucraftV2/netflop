@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { loginWithAuthentik } from "@/app/actions/auth";
+import { safeNextPath } from "@/lib/utils";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { currentUser } from "@/lib/auth-guard";
@@ -17,9 +18,9 @@ const ERRORS: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; logout?: string }>;
+  searchParams: Promise<{ error?: string; logout?: string; next?: string }>;
 }) {
-  const { error, logout } = await searchParams;
+  const { error, logout, next } = await searchParams;
   if (!error && (await currentUser())) redirect("/");
   const message = error ? (ERRORS[error] ?? "La connexion a échoué. Réessaie.") : null;
 
@@ -42,6 +43,7 @@ export default async function LoginPage({
           </p>
         ) : null}
         <form action={loginWithAuthentik} className="mt-6">
+          <input type="hidden" name="next" value={safeNextPath(next)} />
           <Button type="submit" size="lg" className="w-full">
             Se connecter
           </Button>

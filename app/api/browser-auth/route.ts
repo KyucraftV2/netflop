@@ -3,6 +3,7 @@ import { checkBrowserAccess } from "@/lib/browser-auth";
 import { getDb } from "@/lib/db";
 import { sessions, users } from "@/lib/db/schema";
 import { errorMessage, logger } from "@/lib/log";
+import { hasGuestAccess } from "@/lib/watch-party";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,9 @@ const log = logger("browser-auth");
 /**
  * forwardAuth Traefik pour /b/<slug>/… :
  *   401 sans session valide, 403 si <slug> n'est pas l'utilisateur connecté,
- *   200 + X-Netflop-User sinon. Le cookie n'est jamais loggé.
+ *   200 + X-Netflop-User sinon (propriétaire, ou invité avec une invitation active :
+ *   « Regarder ensemble », révocation prise en compte en 30 s au plus).
+ *   Le cookie n'est jamais loggé.
  */
 export async function GET(request: Request) {
   const uri = request.headers.get("x-forwarded-uri");
@@ -27,6 +30,7 @@ export async function GET(request: Request) {
           .where(and(eq(sessions.sessionToken, token), gt(sessions.expires, new Date())));
         return row ?? null;
       },
+      (guestSlug, hostSlug) => hasGuestAccess(guestSlug, hostSlug),
     );
 
     if (result.status === 200) {
