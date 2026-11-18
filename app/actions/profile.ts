@@ -88,6 +88,22 @@ export async function savePausedStop(input: { minutes: number | null }): Promise
   return { ok: true, message: "Enregistré" };
 }
 
+const notifSchema = z.object({ newEpisodes: z.boolean(), queue: z.boolean() });
+
+export async function saveNotificationPrefs(input: {
+  newEpisodes: boolean;
+  queue: boolean;
+}): Promise<ActionResult> {
+  const user = await requireUser();
+  const parsed = notifSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Préférences invalides" };
+  await getDb()
+    .update(users)
+    .set({ notifyNewEpisodes: parsed.data.newEpisodes, notifyQueue: parsed.data.queue })
+    .where(eq(users.id, user.id));
+  return { ok: true, message: "Enregistré" };
+}
+
 /** Supprime le volume netflop-profile-<slug> (navigateur éteint uniquement). */
 export async function resetBrowser(input: { confirm: boolean }): Promise<ActionResult> {
   const user = await requireUser();

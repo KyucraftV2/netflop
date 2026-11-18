@@ -56,6 +56,8 @@ export interface StartRequest {
 }
 
 export interface LifecycleHooks {
+  /** Un utilisateur en file vient d'obtenir un navigateur (notification « C'est ton tour »). */
+  onQueueServed?: (userId: string, platform: PlatformId) => Promise<void>;
   /** Appelé juste avant l'arrêt (étape 5 : dernière capture de progression). */
   beforeStop?: (session: BrowserSession, slug: string) => Promise<void>;
   /** Appelé quand le navigateur devient prêt (étape 4 : navigation vers pendingUrl). */
@@ -472,6 +474,13 @@ export function createLifecycle(deps: LifecycleDeps = {}) {
       try {
         await launch(session);
         served++;
+        if (hooks.onQueueServed) {
+          void hooks
+            .onQueueServed(session.userId, session.platform)
+            .catch((err: unknown) =>
+              log.warn("notification de file", { error: errorMessage(err) }),
+            );
+        }
       } catch {
         // launch a déjà loggé et libéré le slot ; on passe au suivant au prochain tour.
         return served;

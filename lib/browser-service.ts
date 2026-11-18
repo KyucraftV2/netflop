@@ -6,6 +6,7 @@ import {
   type StartRequest,
 } from "./browser-lifecycle";
 import { navigate } from "./cdp";
+import { notifyQueueServed } from "./notifications";
 import { getDb } from "./db";
 import { hintToQuality, type ConnectionHint } from "./browser-spec";
 import { browserSessions, users, type BrowserSession } from "./db/schema";
@@ -64,6 +65,7 @@ export function ensureBrowserHooks(): void {
   registerLifecycleHooks({
     onReady: deliverPendingNavigation,
     beforeStop: (session, slug) => tracker().finalCapture(session, slug),
+    onQueueServed: (userId, platform) => notifyQueueServed(userId, platform),
   });
 }
 
@@ -77,7 +79,6 @@ async function retryPending(userId: string, status: BrowserStatusView): Promise<
   return lifecycle().status(userId);
 }
 
-/** Démarre/rejoint le navigateur et ouvre l'URL demandée (immédiatement s'il tourne déjà). */
 /** Qualité « auto » : mémorise l'estimation de connexion envoyée par l'appareil. */
 export async function rememberConnectionHint(userId: string, hint: ConnectionHint): Promise<void> {
   await getDb()
@@ -86,6 +87,7 @@ export async function rememberConnectionHint(userId: string, hint: ConnectionHin
     .where(eq(users.id, userId));
 }
 
+/** Démarre/rejoint le navigateur et ouvre l'URL demandée (immédiatement s'il tourne déjà). */
 export async function startAndOpen(userId: string, req: StartRequest): Promise<BrowserStatusView> {
   ensureBrowserHooks();
   return retryPending(userId, await lifecycle().start(userId, req));
