@@ -309,24 +309,64 @@ démarrage suivant de chaque navigateur.
 ## Sauvegarde et restauration
 
 La sauvegarde contient la base Postgres (comptes, abonnements, historique) et les volumes
-`netflop-profile-*` (connexions aux plateformes) :
+`netflop-profile-*` (connexions aux plateformes). Elle contient donc des jetons et des
+cookies : garde-la chiffrée ou dans un endroit sûr.
 
 ```bash
-sudo scripts/backup.sh                       # → /var/backups/netflop/<date>/, rotation 14 jours
-sudo scripts/restore.sh /var/backups/netflop/<date>            # base + profils
-sudo scripts/restore.sh /var/backups/netflop/<date> --db       # base seule
+sudo scripts/backup.sh                                     # → /var/backups/netflop/<date>/
+sudo scripts/restore.sh /var/backups/netflop/<date>        # base + profils
+sudo scripts/restore.sh /var/backups/netflop/<date> --db   # base seule
 ```
 
-- Les profils des navigateurs en cours sont sautés, car leur copie serait incohérente.
-  Lance donc la sauvegarde la nuit :
+Réglages, dans `.env` ou en variables d'environnement :
 
-  ```cron
-  # /etc/cron.d/netflop
-  30 4 * * * root /chemin/vers/netflop/scripts/backup.sh >>/var/log/netflop-backup.log 2>&1
-  ```
+| Variable               | Défaut | Rôle                                                                      |
+| ---------------------- | ------ | ------------------------------------------------------------------------- |
+| `BACKUP_KEEP_DAILY`    | `7`    | Nombre de sauvegardes les plus récentes conservées                        |
+| `BACKUP_KEEP_WEEKLY`   | `4`    | Conserve aussi la dernière sauvegarde de chacune des N dernières semaines |
+| `BACKUP_AGE_RECIPIENT` | vide   | Clé publique [age](https://age-encryption.org) : chiffre chaque fichier   |
+| `BACKUP_RCLONE_REMOTE` | vide   | Destination [rclone](https://rclone.org) (ex. `s3:bucket/netflop`)        |
+| `BACKUP_AGE_IDENTITY`  | vide   | Clé privée age utilisée par `restore.sh` (ou `--identity <fichier>`)      |
 
-- Pense à copier `/var/backups/netflop` **hors de la machine** (rsync, restic…).
-- Teste la restauration de temps en temps, par exemple sur une autre machine.
+### Sauvegarde automatique (systemd)
+
+Les profils des navigateurs en cours sont sautés, car leur copie serait incohérente. Le
+timer fourni lance donc la sauvegarde chaque nuit vers 4 h 30 :
+
+```bash
+sed "s#/srv/netflop#$PWD#" scripts/systemd/netflop-backup.service \
+  | sudo tee /etc/systemd/system/netflop-backup.service >/dev/null
+sudo cp scripts/systemd/netflop-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now netflop-backup.timer
+systemctl list-timers netflop-backup.timer         # prochaine exécution
+journalctl -u netflop-backup.service               # journal des sauvegardes
+```
+
+### Chiffrement et copie hors machine
+
+```bash
+age-keygen -o netflop-backup.key       # garde CE fichier hors de la machine (gestionnaire de mots de passe…)
+# Dans .env : BACKUP_AGE_RECIPIENT=<la clé publique « age1… » affichée>
+# Optionnel : rclone config, puis BACKUP_RCLONE_REMOTE=<remote>:<chemin>
+```
+
+Les fichiers sont chiffrés avant la copie hors machine : le stockage distant ne voit
+jamais les données en clair. La rotation ne s'applique qu'au dossier local ; côté
+distant, utilise la politique de rétention du stockage (règle de cycle de vie S3…).
+
+### Restaurer
+
+```bash
+sudo scripts/restore.sh /var/backups/netflop/<date> --identity netflop-backup.key
+```
+
+Options : `--db` ou `--profiles` (une partie seulement), `--yes` (sans confirmation),
+`--no-start` (ne pas redémarrer Netflop à la fin). Le script vérifie les sommes de contrôle,
+arrête le hub, le worker et les navigateurs, puis restaure.
+
+`scripts/test-backup.sh` enchaîne une sauvegarde chiffrée, une modification des données et
+une restauration, puis vérifie le résultat. Il tourne en CI à chaque modification des
+scripts. **Il écrase la base locale** : ne le lance que sur une machine de test.
 
 ## Dépannage
 
