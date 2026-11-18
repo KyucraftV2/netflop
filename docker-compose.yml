@@ -96,13 +96,15 @@ services:
 
   db:
     <<: *common
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: netflop
       POSTGRES_DB: netflop
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans .env}
     volumes:
-      - netflop-db:/var/lib/postgresql/data
+      # Postgres 18 : le volume se monte sur /var/lib/postgresql (données dans 18/docker).
+      # Passage d'une version majeure à l'autre : sauvegarde puis restauration (README).
+      - netflop-db:/var/lib/postgresql
     networks:
       internal: {}
     healthcheck:
