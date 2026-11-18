@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 10
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: netflop
           POSTGRES_HOST_AUTH_METHOD: trust
@@ -54,7 +54,7 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: netflop
           POSTGRES_HOST_AUTH_METHOD: trust

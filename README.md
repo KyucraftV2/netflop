@@ -306,6 +306,22 @@ En build local, remplace les deux `pull` par `docker compose build --pull` et
 Les navigateurs déjà en cours gardent l'ancienne image. La nouvelle s'applique au
 démarrage suivant de chaque navigateur.
 
+### Version majeure de Postgres
+
+Netflop utilise Postgres 18. Une version majeure ne relit pas les fichiers d'une autre :
+une installation faite avec une version antérieure (16) doit passer par une sauvegarde
+puis une restauration. Les profils Chrome ne sont pas concernés.
+
+```bash
+sudo scripts/backup.sh                     # AVANT la mise à jour (ancienne version)
+docker compose down
+docker volume rm netflop-db                # supprime l'ancienne base (la sauvegarde est faite)
+git pull && docker compose pull
+sudo scripts/restore.sh /var/backups/netflop/<date> --db   # recrée la base en 18 et redémarre
+```
+
+Dependabot ne propose jamais ces montées automatiquement.
+
 ## Sauvegarde et restauration
 
 La sauvegarde contient la base Postgres (comptes, abonnements, historique) et les volumes
