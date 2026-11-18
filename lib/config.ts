@@ -51,7 +51,7 @@ const serverSchema = z
     BROWSER_IMAGE: z
       .string()
       .regex(/^[a-z0-9._/:-]+$/)
-      .default("netflop-browser:latest"),
+      .default("ghcr.io/kyucraftv2/netflop-browser:latest"),
     BROWSER_VIDEO_CODEC: z.enum(["h264", "vp8"]).default("h264"),
     // Cycle de vie (étape 3)
     HEARTBEAT_TIMEOUT_SECONDS: z.coerce.number().int().min(20).max(3600).default(60),
