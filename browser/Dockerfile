@@ -3,9 +3,11 @@
 ARG NEKO_VERSION=3.2.0
 FROM ghcr.io/m1k1o/neko/google-chrome:${NEKO_VERSION}
 
-# 1 = liste blanche d'URL (Netflix, Canal+, france.tv, CDN, pages de connexion) :
-# le navigateur ne peut servir à rien d'autre. Désactivée par défaut : un domaine
-# manquant (CDN, captcha) peut bloquer une lecture ; à activer après tests.
+# 1 = liste blanche d'URL : domaines des plateformes, pages de connexion, captchas, CDN.
+# Le navigateur ne peut servir à rien d'autre (page « bloqué par l'administrateur »).
+# policies-allowlist.json est GÉNÉRÉ depuis lib/platforms.ts : `bun run allowlist`.
+# Désactivée par défaut tant que les domaines de chaque plateforme n'ont pas été
+# vérifiés en lecture réelle (image publiée : tag `latest-allowlist`).
 ARG NETFLOP_URL_ALLOWLIST=0
 
 # socat : relais CDP ; iproute2 : attente de l'IP interne avant d'écouter.
