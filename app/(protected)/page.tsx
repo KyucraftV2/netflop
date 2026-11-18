@@ -12,6 +12,7 @@ import { getDb } from "@/lib/db";
 import { userSubscriptions } from "@/lib/db/schema";
 import { logger, errorMessage } from "@/lib/log";
 import { continueWatching } from "@/lib/watch-history";
+import { forYou } from "@/lib/recommendations";
 import { listWatchlist, watchlistKeys } from "@/lib/watchlist";
 
 const log = logger("home");
@@ -46,6 +47,9 @@ export default async function HomePage({
                 <WatchlistSection userId={user.id} subscribed={subscribed} />
               </Suspense>
             ) : null}
+            <Suspense fallback={null}>
+              <ForYouSection userId={user.id} subscribed={subscribed} />
+            </Suspense>
             <PlatformTiles subscribed={subscribed} showAll={toutes === "1"} />
           </>
         )}
@@ -95,6 +99,35 @@ async function WatchlistSection({
       items={items.map((i) => ({
         ...i,
         available: i.platforms.some((p) => subscribed.includes(p)),
+      }))}
+    />
+  );
+}
+
+async function ForYouSection({
+  userId,
+  subscribed,
+}: {
+  userId: string;
+  subscribed: Awaited<ReturnType<typeof getSubscribed>>;
+}) {
+  const items = await forYou(userId, subscribed).catch((err: unknown) => {
+    log.warn("pour toi", { error: errorMessage(err) });
+    return [];
+  });
+  return (
+    <PosterRow
+      id="pour-toi-titre"
+      title="Pour toi"
+      subscribed={subscribed}
+      items={items.map((i) => ({
+        tmdbId: i.tmdbId,
+        type: i.type,
+        title: i.title,
+        year: i.year,
+        posterPath: i.posterPath,
+        platforms: i.platforms,
+        available: true,
       }))}
     />
   );
